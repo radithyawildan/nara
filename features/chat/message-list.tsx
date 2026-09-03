@@ -1,3 +1,7 @@
+﻿"use client";
+
+import { useEffect, useRef } from "react";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -8,16 +12,31 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages }: MessageListProps) {
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
+
   if (messages.length === 0) {
     return (
-      <div className="flex min-h-48 items-center justify-center px-6 text-center">
+      <div className="grid min-h-0 flex-1 place-items-center px-6 py-10 text-center">
         <div>
           <p className="text-sm font-medium text-slate-300">
             Start a conversation with NARA
           </p>
 
-          <p className="mt-2 text-sm text-slate-600">
-            Ask something below or talk to NARA using your microphone.
+          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
+            Type a message or use your microphone to talk naturally.
           </p>
         </div>
       </div>
@@ -26,129 +45,134 @@ export function MessageList({ messages }: MessageListProps) {
 
   return (
     <div
+      ref={scrollContainerRef}
       aria-live="polite"
-      className="flex max-h-[26rem] flex-col gap-4 overflow-y-auto px-1 py-2"
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 [scrollbar-color:rgba(139,92,246,0.25)_transparent] [scrollbar-width:thin]"
     >
-      {messages.map((message) => {
-        const isUser = message.role === "user";
+      <div className="flex flex-col gap-4 py-2">
+        {messages.map((message) => {
+          const isUser = message.role === "user";
 
-        return (
-          <div
-            key={message.id}
-            className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-          >
+          return (
             <div
-              className={
-                isUser
-                  ? "max-w-[80%] rounded-3xl rounded-br-lg bg-violet-500 px-5 py-3 text-sm leading-6 text-white"
-                  : "max-w-[85%] rounded-3xl rounded-bl-lg border border-white/10 bg-white/[0.04] px-5 py-3 text-sm leading-6 text-slate-200"
-              }
+              key={message.id}
+              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
             >
-              {message.content ? (
-                isUser ? (
-                  <p className="whitespace-pre-wrap">{message.content}</p>
-                ) : (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }) => (
-                        <p className="mb-3 last:mb-0">{children}</p>
-                      ),
+              <div
+                className={
+                  isUser
+                    ? "max-w-[88%] rounded-3xl rounded-br-lg bg-violet-500 px-5 py-3 text-sm leading-6 text-white sm:max-w-[80%]"
+                    : "max-w-[92%] rounded-3xl rounded-bl-lg border border-white/10 bg-white/[0.04] px-5 py-3 text-sm leading-6 text-slate-200 sm:max-w-[88%]"
+                }
+              >
+                {message.content ? (
+                  isUser ? (
+                    <p className="whitespace-pre-wrap">{message.content}</p>
+                  ) : (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => (
+                          <p className="mb-3 last:mb-0">{children}</p>
+                        ),
 
-                      strong: ({ children }) => (
-                        <strong className="font-semibold text-white">
-                          {children}
-                        </strong>
-                      ),
-
-                      em: ({ children }) => (
-                        <em className="text-slate-300">{children}</em>
-                      ),
-
-                      h1: ({ children }) => (
-                        <h1 className="mb-3 mt-5 text-xl font-semibold text-white first:mt-0">
-                          {children}
-                        </h1>
-                      ),
-
-                      h2: ({ children }) => (
-                        <h2 className="mb-3 mt-5 text-lg font-semibold text-white first:mt-0">
-                          {children}
-                        </h2>
-                      ),
-
-                      h3: ({ children }) => (
-                        <h3 className="mb-2 mt-4 font-semibold text-white first:mt-0">
-                          {children}
-                        </h3>
-                      ),
-
-                      ul: ({ children }) => (
-                        <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">
-                          {children}
-                        </ul>
-                      ),
-
-                      ol: ({ children }) => (
-                        <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">
-                          {children}
-                        </ol>
-                      ),
-
-                      li: ({ children }) => (
-                        <li className="pl-1">{children}</li>
-                      ),
-
-                      blockquote: ({ children }) => (
-                        <blockquote className="my-3 border-l-2 border-violet-400/50 pl-4 text-slate-400">
-                          {children}
-                        </blockquote>
-                      ),
-
-                      code: ({ children, className }) => {
-                        const isBlock = Boolean(className);
-
-                        if (isBlock) {
-                          return <code className={className}>{children}</code>;
-                        }
-
-                        return (
-                          <code className="rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[0.85em] text-violet-200">
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-white">
                             {children}
-                          </code>
-                        );
-                      },
+                          </strong>
+                        ),
 
-                      pre: ({ children }) => (
-                        <pre className="my-3 overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-xs leading-5 text-slate-300">
-                          {children}
-                        </pre>
-                      ),
+                        em: ({ children }) => (
+                          <em className="text-slate-300">{children}</em>
+                        ),
 
-                      a: ({ children, href }) => (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-violet-300 underline decoration-violet-400/40 underline-offset-4 transition hover:text-violet-200"
-                        >
-                          {children}
-                        </a>
-                      ),
+                        h1: ({ children }) => (
+                          <h1 className="mb-3 mt-5 text-xl font-semibold text-white first:mt-0">
+                            {children}
+                          </h1>
+                        ),
 
-                      hr: () => <hr className="my-4 border-white/10" />,
-                    }}
-                  >
-                    {message.content}
-                  </ReactMarkdown>
-                )
-              ) : (
-                <span className="animate-pulse text-slate-500">? ? ?</span>
-              )}
+                        h2: ({ children }) => (
+                          <h2 className="mb-3 mt-5 text-lg font-semibold text-white first:mt-0">
+                            {children}
+                          </h2>
+                        ),
+
+                        h3: ({ children }) => (
+                          <h3 className="mb-2 mt-4 font-semibold text-white first:mt-0">
+                            {children}
+                          </h3>
+                        ),
+
+                        ul: ({ children }) => (
+                          <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">
+                            {children}
+                          </ul>
+                        ),
+
+                        ol: ({ children }) => (
+                          <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">
+                            {children}
+                          </ol>
+                        ),
+
+                        li: ({ children }) => (
+                          <li className="pl-1">{children}</li>
+                        ),
+
+                        blockquote: ({ children }) => (
+                          <blockquote className="my-3 border-l-2 border-violet-400/50 pl-4 text-slate-400">
+                            {children}
+                          </blockquote>
+                        ),
+
+                        code: ({ children, className }) => {
+                          const isBlock = Boolean(className);
+
+                          if (isBlock) {
+                            return (
+                              <code className={className}>{children}</code>
+                            );
+                          }
+
+                          return (
+                            <code className="rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[0.85em] text-violet-200">
+                              {children}
+                            </code>
+                          );
+                        },
+
+                        pre: ({ children }) => (
+                          <pre className="my-3 overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-xs leading-5 text-slate-300">
+                            {children}
+                          </pre>
+                        ),
+
+                        a: ({ children, href }) => (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-violet-300 underline decoration-violet-400/40 underline-offset-4 transition hover:text-violet-200"
+                          >
+                            {children}
+                          </a>
+                        ),
+
+                        hr: () => <hr className="my-4 border-white/10" />,
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  )
+                ) : (
+                  <span className="animate-pulse text-slate-500">● ● ●</span>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }

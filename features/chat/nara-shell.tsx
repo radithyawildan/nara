@@ -1,41 +1,190 @@
-"use client";
+﻿"use client";
 
-import { useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 
 import { avatarReducer } from "@/features/avatar/avatar-machine";
 import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
+import { NaraSidebar } from "@/features/navigation/nara-sidebar";
+import { VoiceSettings } from "@/features/settings/voice-settings";
 import { useSpeechRecognition } from "@/features/voice/use-speech-recognition";
 import { useSpeechSynthesis } from "@/features/voice/use-speech-synthesis";
-import type { ChatMessage, ConversationMessage } from "@/types/conversation";
+import {
+  createConversation,
+  initializeConversationPersistence,
+  listConversations,
+  loadConversationMessages,
+  saveConversationMessage,
+} from "@/lib/conversations/persistence";
+import type {
+  ChatMessage,
+  ConversationMessage,
+  ConversationSummary,
+} from "@/types/conversation";
 
 type InputSource = "text" | "voice";
+
+function SettingsIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.6v-.1a1.7 1.7 0 0 0-1.4-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 3.8 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2V9.6h.1A1.7 1.7 0 0 0 3.7 8.2a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8 3.8a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2h4v.1A1.7 1.7 0 0 0 14.8 3.7a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.2 8a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.5 1.6Z" />
+    </svg>
+  );
+}
 
 export function NaraShell() {
   const [avatarState, dispatch] = useReducer(avatarReducer, "idle");
 
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
 
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
+
   const [isGenerating, setIsGenerating] = useState(false);
 
+  const [isConversationLoading, setIsConversationLoading] = useState(false);
+
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const [persistenceAvailable, setPersistenceAvailable] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [autoSpeak, setAutoSpeak] = useState(true);
+
+  const [speechRate, setSpeechRate] = useState(1);
+
+  const [speechPitch, setSpeechPitch] = useState(1);
+
+  const [voiceURI, setVoiceURI] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const {
     isSpeaking,
+    voices,
     speak,
     cancel: cancelSpeech,
   } = useSpeechSynthesis({
     language: "id-ID",
-    rate: 1,
-    pitch: 1,
+    rate: speechRate,
+    pitch: speechPitch,
     volume: 1,
+    voiceURI,
   });
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initializePersistence() {
+      try {
+        const available = await initializeConversationPersistence();
+
+        if (cancelled) {
+          return;
+        }
+
+        setPersistenceAvailable(available);
+
+        if (!available) {
+          return;
+        }
+
+        const storedConversations = await listConversations();
+
+        if (cancelled) {
+          return;
+        }
+
+        setConversations(storedConversations);
+
+        const latestConversation = storedConversations[0];
+
+        if (!latestConversation) {
+          return;
+        }
+
+        const storedMessages = await loadConversationMessages(
+          latestConversation.id,
+        );
+
+        if (cancelled) {
+          return;
+        }
+
+        setActiveConversationId(latestConversation.id);
+
+        setMessages(storedMessages);
+      } catch (error) {
+        console.warn(
+          "[NARA] Conversation persistence initialization failed:",
+          error,
+        );
+
+        if (!cancelled) {
+          setPersistenceAvailable(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoading(false);
+        }
+      }
+    }
+
+    void initializePersistence();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function refreshConversationHistory() {
+    if (!persistenceAvailable) {
+      return;
+    }
+
+    try {
+      const storedConversations = await listConversations();
+
+      setConversations(storedConversations);
+    } catch (error) {
+      console.warn("[NARA] Failed to refresh conversation history:", error);
+    }
+  }
+
+  async function persistMessage(
+    conversationId: string,
+    message: ConversationMessage,
+  ) {
+    if (!persistenceAvailable) {
+      return;
+    }
+
+    try {
+      await saveConversationMessage(conversationId, message);
+    } catch (error) {
+      console.warn("[NARA] Failed to persist message:", error);
+    }
+  }
+
   async function handleSubmit(content: string, source: InputSource = "text") {
-    if (isGenerating || isSpeaking) {
+    if (isGenerating || isSpeaking || isConversationLoading) {
       return;
     }
 
@@ -56,6 +205,7 @@ export function NaraShell() {
 
     setMessages(nextMessages);
     setErrorMessage(null);
+    setSettingsOpen(false);
     setIsGenerating(true);
 
     if (source === "text") {
@@ -67,6 +217,31 @@ export function NaraShell() {
     dispatch({
       type: "START_THINKING",
     });
+
+    let conversationId = activeConversationId;
+
+    if (persistenceAvailable && !conversationId) {
+      try {
+        const conversation = await createConversation(normalizedContent);
+
+        if (conversation) {
+          conversationId = conversation.id;
+
+          setActiveConversationId(conversation.id);
+
+          setConversations((current) => [
+            conversation,
+            ...current.filter((item) => item.id !== conversation.id),
+          ]);
+        }
+      } catch (error) {
+        console.warn("[NARA] Failed to create persistent conversation:", error);
+      }
+    }
+
+    if (conversationId) {
+      await persistMessage(conversationId, userMessage);
+    }
 
     const controller = new AbortController();
 
@@ -109,14 +284,17 @@ export function NaraShell() {
 
       const assistantId = crypto.randomUUID();
 
-      const assistantMessage: ConversationMessage = {
-        id: assistantId,
-        role: "assistant",
-        content: "",
-        createdAt: new Date().toISOString(),
-      };
+      const assistantCreatedAt = new Date().toISOString();
 
-      setMessages((current) => [...current, assistantMessage]);
+      setMessages((current) => [
+        ...current,
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          createdAt: assistantCreatedAt,
+        },
+      ]);
 
       const reader = response.body.getReader();
 
@@ -171,6 +349,27 @@ export function NaraShell() {
       }
 
       if (!assistantContent.trim()) {
+        dispatch({
+          type: "RESET",
+        });
+
+        return;
+      }
+
+      const assistantMessage: ConversationMessage = {
+        id: assistantId,
+        role: "assistant",
+        content: assistantContent,
+        createdAt: assistantCreatedAt,
+      };
+
+      if (conversationId) {
+        await persistMessage(conversationId, assistantMessage);
+
+        await refreshConversationHistory();
+      }
+
+      if (!autoSpeak) {
         dispatch({
           type: "RESET",
         });
@@ -237,6 +436,7 @@ export function NaraShell() {
     onStart() {
       cancelSpeech();
 
+      setSettingsOpen(false);
       setErrorMessage(null);
 
       dispatch({
@@ -279,6 +479,8 @@ export function NaraShell() {
     abortListening();
     cancelSpeech();
 
+    setIsGenerating(false);
+
     dispatch({
       type: "RESET",
     });
@@ -293,104 +495,219 @@ export function NaraShell() {
     setMessages([]);
     setErrorMessage(null);
     setIsGenerating(false);
+    setActiveConversationId(null);
+    setSettingsOpen(false);
 
     dispatch({
       type: "RESET",
     });
   }
 
-  const isBusy = isGenerating || isListening || isSpeaking;
+  async function handleSelectConversation(conversationId: string) {
+    if (isGenerating || isSpeaking || isListening || isConversationLoading) {
+      return;
+    }
+
+    if (conversationId === activeConversationId) {
+      return;
+    }
+
+    setIsConversationLoading(true);
+    setErrorMessage(null);
+
+    cancelSpeech();
+
+    dispatch({
+      type: "RESET",
+    });
+
+    try {
+      const storedMessages = await loadConversationMessages(conversationId);
+
+      setActiveConversationId(conversationId);
+
+      setMessages(storedMessages);
+    } catch (error) {
+      console.error("[NARA] Failed to load conversation:", error);
+
+      setErrorMessage("Could not load this conversation.");
+
+      dispatch({
+        type: "FAIL",
+      });
+    } finally {
+      setIsConversationLoading(false);
+    }
+  }
+
+  const isBusy =
+    isGenerating || isListening || isSpeaking || isConversationLoading;
 
   return (
-    <main className="min-h-screen bg-[#050714] text-white">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 py-5 sm:px-6 sm:py-8">
-        <header className="flex items-center justify-between border-b border-white/10 pb-5">
-          <div>
-            <p className="text-lg font-semibold tracking-[0.28em] sm:text-xl">
-              NARA
-            </p>
+    <main className="h-dvh overflow-hidden bg-[#050714] text-white">
+      <div className="mx-auto grid h-full max-w-[1760px] grid-rows-[auto_minmax(0,1fr)] px-4 py-4 sm:px-6 sm:py-5">
+        <header className="relative flex items-center justify-between border-b border-white/[0.07] pb-4">
+          <div className="flex items-center gap-4">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl border border-violet-400/20 bg-violet-500/10 font-semibold text-violet-200 shadow-lg shadow-violet-500/10">
+              N
+            </div>
 
-            <p className="mt-1 hidden text-sm text-slate-500 sm:block">
-              Neural Adaptive Responsive Avatar
-            </p>
+            <div>
+              <p className="text-lg font-semibold tracking-[0.3em] text-white">
+                NARA
+              </p>
+
+              <p className="mt-0.5 hidden text-xs text-slate-500 sm:block">
+                Neural Adaptive Responsive Avatar
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            Online
+          <div className="flex items-center gap-2">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-400/[0.05] px-3 py-2 text-xs text-emerald-300 sm:flex">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+              Online
+            </div>
+
+            <button
+              type="button"
+              aria-label="Open voice settings"
+              aria-expanded={settingsOpen}
+              onClick={() => setSettingsOpen((current) => !current)}
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-violet-400/20 hover:bg-violet-400/[0.08] hover:text-white"
+            >
+              <SettingsIcon />
+            </button>
           </div>
+
+          <VoiceSettings
+            open={settingsOpen}
+            autoSpeak={autoSpeak}
+            rate={speechRate}
+            pitch={speechPitch}
+            voiceURI={voiceURI}
+            voices={voices}
+            onClose={() => setSettingsOpen(false)}
+            onAutoSpeakChange={setAutoSpeak}
+            onRateChange={setSpeechRate}
+            onPitchChange={setSpeechPitch}
+            onVoiceChange={setVoiceURI}
+          />
         </header>
 
-        <section className="grid flex-1 place-items-center py-8">
-          <div className="flex w-full max-w-4xl flex-col gap-7">
-            <NaraAvatar state={avatarState} />
+        <section className="min-h-0 pt-4">
+          <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[minmax(310px,0.8fr)_minmax(520px,1.25fr)] xl:grid-cols-[220px_minmax(340px,0.82fr)_minmax(560px,1.35fr)]">
+            <NaraSidebar
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              messageCount={messages.length}
+              disabled={isBusy}
+              loading={historyLoading}
+              persistenceAvailable={persistenceAvailable}
+              onNewChat={handleNewChat}
+              onSelectConversation={(conversationId) => {
+                void handleSelectConversation(conversationId);
+              }}
+            />
 
-            <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.025] p-4 backdrop-blur-xl sm:p-5">
-              <div className="mb-4 flex items-center justify-between px-1">
+            <section className="relative flex min-h-0 items-center justify-center overflow-hidden rounded-[2rem] border border-white/[0.07] bg-gradient-to-b from-white/[0.025] via-transparent to-violet-500/[0.015]">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(99,102,241,0.07),transparent_52%)]"
+              />
+
+              <div className="origin-center scale-[0.78] sm:scale-[0.86] lg:scale-[0.82] xl:scale-[0.9] 2xl:scale-100">
+                <NaraAvatar state={avatarState} />
+              </div>
+
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-12 bottom-8 h-20 rounded-full bg-violet-500/[0.04] blur-3xl"
+              />
+            </section>
+
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/[0.08] bg-white/[0.022] shadow-2xl shadow-black/10 backdrop-blur-xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/[0.055] px-5 py-4">
                 <div>
-                  <p className="text-xs font-medium tracking-[0.18em] text-slate-500 uppercase">
+                  <p className="text-[10px] font-medium tracking-[0.2em] text-slate-500 uppercase">
                     Conversation
                   </p>
 
-                  {isListening && (
-                    <p className="mt-1 text-xs text-violet-300">
-                      Listening to your voice�
-                    </p>
-                  )}
+                  <div className="mt-1 flex items-center gap-2">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        isSpeaking
+                          ? "bg-emerald-300"
+                          : isListening
+                            ? "bg-cyan-300"
+                            : isGenerating
+                              ? "bg-violet-300"
+                              : isConversationLoading
+                                ? "bg-sky-300"
+                                : "bg-slate-600"
+                      }`}
+                    />
 
-                  {isSpeaking && (
-                    <p className="mt-1 text-xs text-cyan-300">
-                      NARA is speaking�
+                    <p className="text-xs text-slate-500">
+                      {isListening
+                        ? "Listening to your voice..."
+                        : isSpeaking
+                          ? "NARA is speaking..."
+                          : isGenerating
+                            ? "Generating response..."
+                            : isConversationLoading
+                              ? "Loading conversation..."
+                              : persistenceAvailable
+                                ? "Ready - conversations are saved"
+                                : "Ready for conversation"}
                     </p>
-                  )}
+                  </div>
                 </div>
 
-                {messages.length > 0 && (
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={handleNewChat}
-                    className="text-xs text-slate-500 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    New chat
-                  </button>
+                <button
+                  type="button"
+                  onClick={handleNewChat}
+                  disabled={isBusy || messages.length === 0}
+                  className="rounded-full px-3 py-1.5 text-xs text-slate-600 transition hover:bg-white/[0.04] hover:text-slate-300 disabled:cursor-not-allowed disabled:opacity-30"
+                >
+                  New
+                </button>
+              </div>
+
+              <div className="flex min-h-0 flex-1 flex-col px-5 pt-3">
+                <MessageList messages={messages} />
+
+                {errorMessage && (
+                  <div className="mb-3 shrink-0 rounded-2xl border border-red-400/20 bg-red-400/[0.05] px-4 py-3 text-sm text-red-300">
+                    {errorMessage}
+                  </div>
                 )}
-              </div>
 
-              <MessageList messages={messages} />
+                <div className="shrink-0 border-t border-white/[0.06] pb-4 pt-4">
+                  <Composer
+                    isGenerating={
+                      isGenerating || isSpeaking || isConversationLoading
+                    }
+                    isListening={isListening}
+                    voiceSupported={voiceSupported}
+                    interimTranscript={interimTranscript}
+                    onSubmit={(content) => {
+                      void handleSubmit(content, "text");
+                    }}
+                    onCancel={handleCancel}
+                    onStartListening={startListening}
+                    onStopListening={stopListening}
+                  />
 
-              {errorMessage && (
-                <div className="my-4 rounded-2xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-300">
-                  {errorMessage}
+                  {!voiceSupported && (
+                    <p className="mt-2 px-2 text-xs text-amber-300/60">
+                      Voice input is unavailable in this browser. Text chat
+                      remains active.
+                    </p>
+                  )}
                 </div>
-              )}
-
-              <div className="mt-5">
-                <Composer
-                  isGenerating={isGenerating || isSpeaking}
-                  isListening={isListening}
-                  voiceSupported={voiceSupported}
-                  interimTranscript={interimTranscript}
-                  onSubmit={(content) => {
-                    void handleSubmit(content, "text");
-                  }}
-                  onCancel={handleCancel}
-                  onStartListening={startListening}
-                  onStopListening={stopListening}
-                />
               </div>
-
-              {!voiceSupported && (
-                <p className="mt-3 px-2 text-xs text-amber-300/70">
-                  Voice input is not supported by this browser. Text chat
-                  remains available.
-                </p>
-              )}
-            </div>
-
-            <p className="text-center text-xs text-slate-700">
-              NARA can make mistakes. Check important information.
-            </p>
+            </section>
           </div>
         </section>
       </div>
