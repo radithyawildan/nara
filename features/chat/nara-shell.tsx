@@ -7,6 +7,7 @@ import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
+import { MemorySuggestionCard } from "@/features/memory/memory-suggestion-card";
 import { NaraSidebar } from "@/features/navigation/nara-sidebar";
 import { VoiceSettings } from "@/features/settings/voice-settings";
 import { useSpeechRecognition } from "@/features/voice/use-speech-recognition";
@@ -24,6 +25,10 @@ import {
   listMemories,
   updateMemory,
 } from "@/lib/memory/client";
+import {
+  detectMemoryCandidate,
+  type MemoryCandidate,
+} from "@/lib/memory/candidate";
 import type {
   ChatMessage,
   ConversationMessage,
@@ -87,6 +92,11 @@ export function NaraShell() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
 
   const [memories, setMemories] = useState<NaraMemory[]>([]);
+
+  const [memoryCandidate, setMemoryCandidate] =
+    useState<MemoryCandidate | null>(null);
+
+  const [isSavingMemoryCandidate, setIsSavingMemoryCandidate] = useState(false);
 
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
@@ -327,6 +337,67 @@ export function NaraShell() {
     }
   }
 
+  async function handleAcceptMemoryCandidate(
+    content: string,
+    category: MemoryCategory,
+  ) {
+    const normalizedContent = content.trim();
+
+    if (!memoryCandidate || !normalizedContent) {
+      return;
+    }
+
+    const duplicate = memories.some(
+      (memory) =>
+        memory.content.trim().toLowerCase() === normalizedContent.toLowerCase(),
+    );
+
+    if (duplicate) {
+      setMemoryCandidate(null);
+      return;
+    }
+
+    setIsSavingMemoryCandidate(true);
+
+    try {
+      await handleCreateMemory(normalizedContent, category);
+
+      setMemoryCandidate(null);
+    } finally {
+      setIsSavingMemoryCandidate(false);
+    }
+  }
+
+  async function handleReplaceMemoryCandidate(
+    existingMemoryId: string,
+    content: string,
+    category: MemoryCategory,
+  ) {
+    const normalizedContent = content.trim();
+
+    if (!memoryCandidate || !normalizedContent) {
+      return;
+    }
+
+    setIsSavingMemoryCandidate(true);
+
+    try {
+      await handleUpdateMemory(existingMemoryId, normalizedContent, category);
+
+      const replacedMemory = memories.find(
+        (memory) => memory.id === existingMemoryId,
+      );
+
+      if (replacedMemory && !replacedMemory.isEnabled) {
+        await handleToggleMemory(existingMemoryId, true);
+      }
+
+      setMemoryCandidate(null);
+    } finally {
+      setIsSavingMemoryCandidate(false);
+    }
+  }
+
   async function handleSubmit(content: string, source: InputSource = "text") {
     if (isGenerating || isSpeaking || isConversationLoading) {
       return;
@@ -354,6 +425,12 @@ export function NaraShell() {
         console.warn("[NARA] Failed to save explicit memory:", error);
       }
     }
+
+    const candidate = explicitMemory
+      ? null
+      : detectMemoryCandidate(normalizedContent);
+
+    setMemoryCandidate(candidate);
 
     const userMessage: ConversationMessage = {
       id: crypto.randomUUID(),
@@ -662,6 +739,7 @@ export function NaraShell() {
     setActiveConversationId(null);
     setSettingsOpen(false);
     setMemoryCenterOpen(false);
+    setMemoryCandidate(null);
 
     dispatch({
       type: "RESET",
@@ -875,6 +953,28 @@ export function NaraShell() {
                   <div className="mb-3 shrink-0 rounded-2xl border border-red-400/20 bg-red-400/[0.05] px-4 py-3 text-sm text-red-300">
                     {errorMessage}
                   </div>
+                )}
+
+                {memoryCandidate && (
+                  <MemorySuggestionCard
+                    memories={memories}
+                    key={`${memoryCandidate.category}:${memoryCandidate.content}`}
+                    candidate={memoryCandidate}
+                    saving={isSavingMemoryCandidate}
+                    disabled={isGenerating || isConversationLoading}
+                    onSave={(content, category) => {
+                      void handleAcceptMemoryCandidate(content, category);
+                    }}
+                    onDismiss={() => setMemoryCandidate(null)}
+
+                    onReplace={(existingMemoryId, content, category) => {
+                      void handleReplaceMemoryCandidate(
+                        existingMemoryId,
+                        content,
+                        category,
+                      );
+                    }}
+                  />
                 )}
 
                 <div className="shrink-0 border-t border-white/[0.06] pb-4 pt-4">
