@@ -74,7 +74,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const memoryContext = await getMemoryContext();
+    const latestUserMessage =
+      [...result.data.messages]
+        .reverse()
+        .find((message) => message.role === "user")?.content ?? "";
+
+    const memoryContext = await getMemoryContext(latestUserMessage);
 
     const conversation = streamConversation(provider, result.data.messages, {
       signal: request.signal,
