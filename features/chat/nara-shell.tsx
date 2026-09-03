@@ -8,6 +8,7 @@ import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
+import { MemoryDebugInspector } from "@/features/memory/memory-debug-inspector";
 import { MemorySuggestionCard } from "@/features/memory/memory-suggestion-card";
 import { NaraSidebar } from "@/features/navigation/nara-sidebar";
 import { VoiceSettings } from "@/features/settings/voice-settings";
@@ -85,6 +86,8 @@ function MemoryIcon() {
   );
 }
 
+import type { MemoryRetrievalDebug } from "@/types/memory-debug";
+
 export function NaraShell() {
   const [avatarState, dispatch] = useReducer(avatarReducer, "idle");
 
@@ -93,6 +96,10 @@ export function NaraShell() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
 
   const [memories, setMemories] = useState<NaraMemory[]>([]);
+
+  const [memoryDebug, setMemoryDebug] = useState<MemoryRetrievalDebug | null>(
+    null,
+  );
 
   const [memoryCandidate, setMemoryCandidate] =
     useState<MemoryCandidate | null>(null);
@@ -529,6 +536,24 @@ export function NaraShell() {
         signal: controller.signal,
       });
 
+      const encodedMemoryDebug = response.headers.get("X-NARA-Memory-Debug");
+
+      if (encodedMemoryDebug) {
+        try {
+          const parsedMemoryDebug = JSON.parse(
+            decodeURIComponent(encodedMemoryDebug),
+          ) as MemoryRetrievalDebug;
+
+          setMemoryDebug(parsedMemoryDebug);
+        } catch (error) {
+          console.warn("[NARA] Could not parse memory debug metadata:", error);
+
+          setMemoryDebug(null);
+        }
+      } else {
+        setMemoryDebug(null);
+      }
+
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: string;
@@ -762,6 +787,7 @@ export function NaraShell() {
     setSettingsOpen(false);
     setMemoryCenterOpen(false);
     setMemoryCandidate(null);
+    setMemoryDebug(null);
 
     dispatch({
       type: "RESET",
@@ -1020,6 +1046,8 @@ export function NaraShell() {
           </div>
         </section>
       </div>
+
+      <MemoryDebugInspector debug={memoryDebug} />
 
       <MemoryCenter
         open={memoryCenterOpen}

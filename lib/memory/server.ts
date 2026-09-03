@@ -4,6 +4,8 @@ import { rankRelevantMemories } from "@/lib/memory/retrieval";
 
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
+import type { MemoryRetrievalDebug } from "@/types/memory-debug";
+
 import type { MemoryCategory } from "@/types/memory";
 
 interface EnabledMemoryRow {
@@ -26,23 +28,56 @@ interface HybridMemory {
   category: MemoryCategory;
   content: string;
   updatedAt: string;
+
   lexicalScore: number;
   semanticScore: number;
   score: number;
+
   reasons: string[];
 }
 
-export async function getMemoryContext(query: string) {
+export interface MemoryContextResult {
+  context: string;
+  debug: MemoryRetrievalDebug;
+}
+
+function createEmptyDebug(
+  query: string,
+  semanticAvailable = true,
+): MemoryRetrievalDebug {
+  return {
+    query,
+
+    totalEnabledMemories: 0,
+    lexicalCandidateCount: 0,
+    semanticCandidateCount: 0,
+    selectedCount: 0,
+
+    semanticAvailable,
+
+    selected: [],
+  };
+}
+
+export async function getMemoryContext(
+  query: string,
+): Promise<MemoryContextResult> {
   const supabase = await getSupabaseServerClient();
 
   if (!supabase) {
-    return "";
+    return {
+      context: "",
+      debug: createEmptyDebug(query, false),
+    };
   }
 
   const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData.user) {
-    return "";
+    return {
+      context: "",
+      debug: createEmptyDebug(query, false),
+    };
   }
 
   const { data, error } = await supabase
@@ -57,36 +92,56 @@ export async function getMemoryContext(query: string) {
   if (error) {
     console.warn("[NARA] Failed to load memories:", error);
 
-    return "";
+    return {
+      context: "",
+      debug: createEmptyDebug(query, false),
+    };
   }
 
   const memories = ((data ?? []) as EnabledMemoryRow[]).map((memory) => ({
     id: memory.id,
+
     category: memory.category,
+
     content: memory.content,
+
     updatedAt: memory.updated_at,
   }));
 
+  const debug = createEmptyDebug(query);
+
+  debug.totalEnabledMemories = memories.length;
+
   if (memories.length === 0) {
-    return "";
+    return {
+      context: "",
+      debug,
+    };
   }
 
   const lexical = rankRelevantMemories(query, memories, 8);
 
+  debug.lexicalCandidateCount = lexical.length;
+
   let semantic: SemanticMemoryRow[] = [];
+
+  let semanticAvailable = true;
 
   try {
     if (query.trim()) {
       const queryEmbedding = await embedMemoryQuery(query);
 
-      const { data: semanticData, error: semanticError } = await supabase.rpc(
-        "match_memories",
-        {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.45,
-          match_count: 8,
-        },
-      );
+      const {
+        data: semanticData,
+
+        error: semanticError,
+      } = await supabase.rpc("match_memories", {
+        query_embedding: queryEmbedding,
+
+        match_threshold: 0.45,
+
+        match_count: 8,
+      });
 
       if (semanticError) {
         throw semanticError;
@@ -95,23 +150,36 @@ export async function getMemoryContext(query: string) {
       semantic = (semanticData ?? []) as SemanticMemoryRow[];
     }
   } catch (error) {
+    semanticAvailable = false;
+
     console.warn(
       "[NARA] Semantic memory retrieval unavailable; using lexical fallback:",
       error,
     );
   }
 
+  debug.semanticAvailable = semanticAvailable;
+
+  debug.semanticCandidateCount = semantic.length;
+
   const combined = new Map<string, HybridMemory>();
 
   for (const memory of lexical) {
     combined.set(memory.id, {
       id: memory.id,
+
       category: memory.category,
+
       content: memory.content,
+
       updatedAt: memory.updatedAt ?? "",
+
       lexicalScore: memory.score,
+
       semanticScore: 0,
+
       score: memory.score,
+
       reasons: [...memory.reasons],
     });
   }
@@ -126,19 +194,28 @@ export async function getMemoryContext(query: string) {
 
       existing.score = existing.lexicalScore + semanticScore * 6;
 
-      existing.reasons.push("semantic match");
+      if (!existing.reasons.includes("semantic match")) {
+        existing.reasons.push("semantic match");
+      }
 
       continue;
     }
 
     combined.set(memory.id, {
       id: memory.id,
+
       category: memory.category,
+
       content: memory.content,
+
       updatedAt: memory.updated_at,
+
       lexicalScore: 0,
+
       semanticScore,
+
       score: semanticScore * 6,
+
       reasons: ["semantic match"],
     });
   }
@@ -147,34 +224,40 @@ export async function getMemoryContext(query: string) {
     .sort((left, right) => right.score - left.score)
     .slice(0, 6);
 
-  if (relevantMemories.length === 0) {
-    return "";
-  }
+  debug.selectedCount = relevantMemories.length;
+
+  debug.selected = relevantMemories.map((memory) => ({
+    id: memory.id,
+
+    category: memory.category,
+
+    content: memory.content,
+
+    score: Number(memory.score.toFixed(3)),
+
+    lexicalScore: Number(memory.lexicalScore.toFixed(3)),
+
+    semanticScore: Number(memory.semanticScore.toFixed(3)),
+
+    reasons: memory.reasons,
+  }));
 
   if (process.env.NODE_ENV === "development") {
-    console.log(
-      "[NARA] Hybrid memory retrieval:",
-      relevantMemories.map((memory) => ({
-        category: memory.category,
+    console.log("[NARA] Hybrid memory retrieval:", debug);
+  }
 
-        score: Number(memory.score.toFixed(2)),
-
-        lexical: Number(memory.lexicalScore.toFixed(2)),
-
-        semantic: Number(memory.semanticScore.toFixed(3)),
-
-        reasons: memory.reasons,
-
-        content: memory.content,
-      })),
-    );
+  if (relevantMemories.length === 0) {
+    return {
+      context: "",
+      debug,
+    };
   }
 
   const formatted = relevantMemories
     .map((memory) => `- [${memory.category}] ${memory.content}`)
     .join("\n");
 
-  return `
+  const context = `
 The following are relevant long-term memories explicitly saved by the user.
 
 Use them only when relevant to the current request.
@@ -185,4 +268,9 @@ A current user instruction always overrides a saved memory.
 Relevant memories:
 ${formatted}
 `.trim();
+
+  return {
+    context,
+    debug,
+  };
 }

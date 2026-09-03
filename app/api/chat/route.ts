@@ -79,12 +79,12 @@ export async function POST(request: Request) {
         .reverse()
         .find((message) => message.role === "user")?.content ?? "";
 
-    const memoryContext = await getMemoryContext(latestUserMessage);
+    const memoryResult = await getMemoryContext(latestUserMessage);
 
     const conversation = streamConversation(provider, result.data.messages, {
       signal: request.signal,
 
-      additionalInstructions: memoryContext || undefined,
+      additionalInstructions: memoryResult.context || undefined,
     });
 
     const iterator = conversation[Symbol.asyncIterator]();
@@ -137,12 +137,25 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
+    const headers = new Headers({
+      "Content-Type": "text/plain; charset=utf-8",
 
-        "Cache-Control": "no-cache, no-store",
-      },
+      "Cache-Control": "no-cache, no-store",
+    });
+
+    if (process.env.NODE_ENV === "development") {
+      try {
+        headers.set(
+          "X-NARA-Memory-Debug",
+          encodeURIComponent(JSON.stringify(memoryResult.debug)),
+        );
+      } catch (error) {
+        console.warn("[NARA] Could not serialize memory debug header:", error);
+      }
+    }
+
+    return new Response(stream, {
+      headers,
     });
   } catch (error) {
     console.error("[NARA] Conversation provider failed:", error);
