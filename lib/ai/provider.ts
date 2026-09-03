@@ -1,7 +1,9 @@
-import type { ChatMessage } from "@/types/conversation";
+﻿import type { ChatMessage } from "@/types/conversation";
 
 export interface AIStreamOptions {
   signal?: AbortSignal;
+
+  additionalInstructions?: string;
 }
 
 export interface AIProvider {

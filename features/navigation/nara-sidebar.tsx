@@ -7,11 +7,14 @@ interface NaraSidebarProps {
   activeConversationId: string | null;
 
   messageCount: number;
+  memoryCount: number;
+
   disabled: boolean;
   loading: boolean;
   persistenceAvailable: boolean;
 
   onNewChat: () => void;
+  onOpenMemories: () => void;
 
   onSelectConversation: (conversationId: string) => void;
 }
@@ -25,14 +28,35 @@ function formatConversationTime(value: string) {
   }).format(date);
 }
 
+function MemoryIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 4a3 3 0 0 0-5 2.2A3.5 3.5 0 0 0 4.5 13 3.5 3.5 0 0 0 9 17.8V4Z" />
+      <path d="M15 4a3 3 0 0 1 5 2.2 3.5 3.5 0 0 1-.5 6.8 3.5 3.5 0 0 1-4.5 4.8V4Z" />
+      <path d="M12 4v16" />
+    </svg>
+  );
+}
+
 export function NaraSidebar({
   conversations,
   activeConversationId,
   messageCount,
+  memoryCount,
   disabled,
   loading,
   persistenceAvailable,
   onNewChat,
+  onOpenMemories,
   onSelectConversation,
 }: NaraSidebarProps) {
   return (
@@ -47,7 +71,23 @@ export function NaraSidebar({
         New conversation
       </button>
 
-      <div className="mt-6 flex min-h-0 flex-1 flex-col">
+      <button
+        type="button"
+        disabled={!persistenceAvailable}
+        onClick={onOpenMemories}
+        className="mt-2 flex w-full items-center justify-between rounded-2xl border border-transparent px-3 py-3 text-sm text-slate-400 transition hover:border-white/[0.06] hover:bg-white/[0.03] hover:text-white disabled:cursor-not-allowed disabled:opacity-30"
+      >
+        <span className="flex items-center gap-3">
+          <MemoryIcon />
+          Memory
+        </span>
+
+        <span className="rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[9px] text-slate-500">
+          {memoryCount}
+        </span>
+      </button>
+
+      <div className="mt-5 flex min-h-0 flex-1 flex-col">
         <div className="flex items-center justify-between px-2">
           <p className="text-[10px] font-medium tracking-[0.18em] text-slate-600 uppercase">
             Recent
