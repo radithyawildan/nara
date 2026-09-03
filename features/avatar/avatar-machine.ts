@@ -17,30 +17,39 @@ export function avatarReducer(
       if (event.type === "START_LISTENING") {
         return "listening";
       }
+
+      if (event.type === "START_THINKING") {
+        return "thinking";
+      }
+
       break;
 
     case "listening":
       if (event.type === "START_TRANSCRIBING") {
         return "transcribing";
       }
+
       break;
 
     case "transcribing":
       if (event.type === "START_THINKING") {
         return "thinking";
       }
+
       break;
 
     case "thinking":
       if (event.type === "START_SPEAKING") {
         return "speaking";
       }
+
       break;
 
     case "speaking":
       if (event.type === "FINISH_SPEAKING") {
         return "idle";
       }
+
       break;
 
     case "error":
