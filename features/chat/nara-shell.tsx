@@ -6,25 +6,49 @@ import { avatarReducer } from "@/features/avatar/avatar-machine";
 import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
+import { useSpeechRecognition } from "@/features/voice/use-speech-recognition";
+import { useSpeechSynthesis } from "@/features/voice/use-speech-synthesis";
 import type { ChatMessage, ConversationMessage } from "@/types/conversation";
+
+type InputSource = "text" | "voice";
 
 export function NaraShell() {
   const [avatarState, dispatch] = useReducer(avatarReducer, "idle");
+
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
+
   const [isGenerating, setIsGenerating] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  async function handleSubmit(content: string) {
-    if (isGenerating) {
+  const {
+    isSpeaking,
+    speak,
+    cancel: cancelSpeech,
+  } = useSpeechSynthesis({
+    language: "id-ID",
+    rate: 1,
+    pitch: 1,
+    volume: 1,
+  });
+
+  async function handleSubmit(content: string, source: InputSource = "text") {
+    if (isGenerating || isSpeaking) {
+      return;
+    }
+
+    const normalizedContent = content.trim();
+
+    if (!normalizedContent) {
       return;
     }
 
     const userMessage: ConversationMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content,
+      content: normalizedContent,
       createdAt: new Date().toISOString(),
     };
 
@@ -34,10 +58,18 @@ export function NaraShell() {
     setErrorMessage(null);
     setIsGenerating(true);
 
-    dispatch({ type: "RESET" });
-    dispatch({ type: "START_THINKING" });
+    if (source === "text") {
+      dispatch({
+        type: "RESET",
+      });
+    }
+
+    dispatch({
+      type: "START_THINKING",
+    });
 
     const controller = new AbortController();
+
     abortControllerRef.current = controller;
 
     const requestMessages: ChatMessage[] = nextMessages.map((message) => ({
@@ -45,18 +77,18 @@ export function NaraShell() {
       content: message.content,
     }));
 
-    let assistantId: string | null = null;
-    let speakingStarted = false;
-
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify({
           messages: requestMessages,
         }),
+
         signal: controller.signal,
       });
 
@@ -75,7 +107,7 @@ export function NaraShell() {
         throw new Error("The conversation stream is unavailable.");
       }
 
-      assistantId = crypto.randomUUID();
+      const assistantId = crypto.randomUUID();
 
       const assistantMessage: ConversationMessage = {
         id: assistantId,
@@ -87,6 +119,7 @@ export function NaraShell() {
       setMessages((current) => [...current, assistantMessage]);
 
       const reader = response.body.getReader();
+
       const decoder = new TextDecoder();
 
       let assistantContent = "";
@@ -106,18 +139,11 @@ export function NaraShell() {
           continue;
         }
 
-        if (!speakingStarted) {
-          dispatch({ type: "START_SPEAKING" });
-          speakingStarted = true;
-        }
-
         assistantContent += chunk;
-
-        const currentAssistantId = assistantId;
 
         setMessages((current) =>
           current.map((message) =>
-            message.id === currentAssistantId
+            message.id === assistantId
               ? {
                   ...message,
                   content: assistantContent,
@@ -127,14 +153,56 @@ export function NaraShell() {
         );
       }
 
-      if (speakingStarted) {
-        dispatch({ type: "FINISH_SPEAKING" });
-      } else {
-        dispatch({ type: "RESET" });
+      const remainingChunk = decoder.decode();
+
+      if (remainingChunk) {
+        assistantContent += remainingChunk;
+
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === assistantId
+              ? {
+                  ...message,
+                  content: assistantContent,
+                }
+              : message,
+          ),
+        );
+      }
+
+      if (!assistantContent.trim()) {
+        dispatch({
+          type: "RESET",
+        });
+
+        return;
+      }
+
+      try {
+        await speak(assistantContent, {
+          onStart() {
+            dispatch({
+              type: "START_SPEAKING",
+            });
+          },
+        });
+
+        dispatch({
+          type: "FINISH_SPEAKING",
+        });
+      } catch (speechError) {
+        console.warn("[NARA] Speech synthesis failed:", speechError);
+
+        dispatch({
+          type: "RESET",
+        });
       }
     } catch (error) {
       if (controller.signal.aborted) {
-        dispatch({ type: "RESET" });
+        dispatch({
+          type: "RESET",
+        });
+
         return;
       }
 
@@ -146,16 +214,92 @@ export function NaraShell() {
           : "NARA could not complete the response.",
       );
 
-      dispatch({ type: "FAIL" });
+      dispatch({
+        type: "FAIL",
+      });
     } finally {
       abortControllerRef.current = null;
+
       setIsGenerating(false);
     }
   }
 
+  const {
+    supported: voiceSupported,
+    isListening,
+    interimTranscript,
+    start: startListening,
+    stop: stopListening,
+    abort: abortListening,
+  } = useSpeechRecognition({
+    language: "id-ID",
+
+    onStart() {
+      cancelSpeech();
+
+      setErrorMessage(null);
+
+      dispatch({
+        type: "RESET",
+      });
+
+      dispatch({
+        type: "START_LISTENING",
+      });
+    },
+
+    onFinalTranscript(transcript) {
+      dispatch({
+        type: "START_TRANSCRIBING",
+      });
+
+      void handleSubmit(transcript, "voice");
+    },
+
+    onEnd(hadFinalTranscript) {
+      if (!hadFinalTranscript) {
+        dispatch({
+          type: "RESET",
+        });
+      }
+    },
+
+    onError(message) {
+      setErrorMessage(message);
+
+      dispatch({
+        type: "FAIL",
+      });
+    },
+  });
+
   function handleCancel() {
     abortControllerRef.current?.abort();
+
+    abortListening();
+    cancelSpeech();
+
+    dispatch({
+      type: "RESET",
+    });
   }
+
+  function handleNewChat() {
+    abortControllerRef.current?.abort();
+
+    abortListening();
+    cancelSpeech();
+
+    setMessages([]);
+    setErrorMessage(null);
+    setIsGenerating(false);
+
+    dispatch({
+      type: "RESET",
+    });
+  }
+
+  const isBusy = isGenerating || isListening || isSpeaking;
 
   return (
     <main className="min-h-screen bg-[#050714] text-white">
@@ -165,6 +309,7 @@ export function NaraShell() {
             <p className="text-lg font-semibold tracking-[0.28em] sm:text-xl">
               NARA
             </p>
+
             <p className="mt-1 hidden text-sm text-slate-500 sm:block">
               Neural Adaptive Responsive Avatar
             </p>
@@ -186,18 +331,26 @@ export function NaraShell() {
                   <p className="text-xs font-medium tracking-[0.18em] text-slate-500 uppercase">
                     Conversation
                   </p>
+
+                  {isListening && (
+                    <p className="mt-1 text-xs text-violet-300">
+                      Listening to your voice�
+                    </p>
+                  )}
+
+                  {isSpeaking && (
+                    <p className="mt-1 text-xs text-cyan-300">
+                      NARA is speaking�
+                    </p>
+                  )}
                 </div>
 
                 {messages.length > 0 && (
                   <button
                     type="button"
-                    disabled={isGenerating}
-                    onClick={() => {
-                      setMessages([]);
-                      setErrorMessage(null);
-                      dispatch({ type: "RESET" });
-                    }}
-                    className="text-xs text-slate-500 transition hover:text-white disabled:opacity-40"
+                    disabled={isBusy}
+                    onClick={handleNewChat}
+                    className="text-xs text-slate-500 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     New chat
                   </button>
@@ -214,11 +367,25 @@ export function NaraShell() {
 
               <div className="mt-5">
                 <Composer
-                  isGenerating={isGenerating}
-                  onSubmit={handleSubmit}
+                  isGenerating={isGenerating || isSpeaking}
+                  isListening={isListening}
+                  voiceSupported={voiceSupported}
+                  interimTranscript={interimTranscript}
+                  onSubmit={(content) => {
+                    void handleSubmit(content, "text");
+                  }}
                   onCancel={handleCancel}
+                  onStartListening={startListening}
+                  onStopListening={stopListening}
                 />
               </div>
+
+              {!voiceSupported && (
+                <p className="mt-3 px-2 text-xs text-amber-300/70">
+                  Voice input is not supported by this browser. Text chat
+                  remains available.
+                </p>
+              )}
             </div>
 
             <p className="text-center text-xs text-slate-700">
