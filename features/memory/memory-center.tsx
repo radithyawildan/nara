@@ -368,11 +368,28 @@ export function MemoryCenter({
                             </div>
 
                             <div className="mt-4 flex items-center justify-between border-t border-white/[0.05] pt-3">
-                              <span className="text-[10px] text-slate-700">
-                                {memory.isEnabled
-                                  ? "Used when relevant"
-                                  : "Currently disabled"}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] text-slate-700">
+                                  {memory.isEnabled
+                                    ? "Used when relevant"
+                                    : "Currently disabled"}
+                                </span>
+
+                                <span
+                                  className={`rounded-full border px-2 py-0.5 text-[9px] ${
+                                    memory.semanticReady
+                                      ? "border-cyan-400/15 bg-cyan-400/[0.05] text-cyan-300/70"
+                                      : "border-amber-400/15 bg-amber-400/[0.05] text-amber-300/70"
+                                  }`}
+                                  title={
+                                    memory.embeddingModel ?? "Embedding pending"
+                                  }
+                                >
+                                  {memory.semanticReady
+                                    ? "Semantic ready"
+                                    : "Semantic pending"}
+                                </span>
+                              </div>
 
                               <div className="flex items-center gap-1">
                                 <button

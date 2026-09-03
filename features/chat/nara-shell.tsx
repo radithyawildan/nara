@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
+import { backfillMemoryEmbeddings } from "@/lib/memory/client";
 
 import { avatarReducer } from "@/features/avatar/avatar-machine";
 import { NaraAvatar } from "@/features/avatar/nara-avatar";
@@ -172,6 +173,27 @@ export function NaraShell() {
         setConversations(storedConversations);
 
         setMemories(storedMemories);
+
+        void backfillMemoryEmbeddings()
+          .then(async (result) => {
+            if (cancelled || result.processed === 0) {
+              return;
+            }
+
+            console.log("[NARA] Automatic memory embedding backfill:", result);
+
+            const refreshedMemories = await listMemories();
+
+            if (!cancelled) {
+              setMemories(refreshedMemories);
+            }
+          })
+          .catch((error) => {
+            console.warn(
+              "[NARA] Automatic memory embedding backfill unavailable:",
+              error,
+            );
+          });
 
         const latestConversation = storedConversations[0];
 

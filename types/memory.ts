@@ -13,6 +13,11 @@ export interface NaraMemory {
   category: MemoryCategory;
   content: string;
   isEnabled: boolean;
+
+  semanticReady: boolean;
+  embeddingModel: string | null;
+  embeddingUpdatedAt: string | null;
+
   createdAt: string;
   updatedAt: string;
 }
