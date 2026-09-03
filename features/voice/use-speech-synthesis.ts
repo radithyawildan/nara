@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,6 +17,7 @@ interface UseSpeechSynthesisOptions {
   rate?: number;
   pitch?: number;
   volume?: number;
+  voiceURI?: string | null;
 }
 
 export function useSpeechSynthesis({
@@ -24,12 +25,39 @@ export function useSpeechSynthesis({
   rate = 1,
   pitch = 1,
   volume = 1,
+  voiceURI = null,
 }: UseSpeechSynthesisOptions = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const speechIdRef = useRef(0);
 
   const activeResolveRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    if (!isSpeechSynthesisSupported()) {
+      return;
+    }
+
+    const speechSynthesis = window.speechSynthesis;
+
+    function updateVoices() {
+      setVoices(speechSynthesis.getVoices());
+    }
+
+    speechSynthesis.addEventListener("voiceschanged", updateVoices);
+
+    // Run asynchronously so React's
+    // set-state-in-effect rule remains happy.
+    const initialLoad = window.setTimeout(updateVoices, 0);
+
+    return () => {
+      window.clearTimeout(initialLoad);
+
+      speechSynthesis.removeEventListener("voiceschanged", updateVoices);
+    };
+  }, []);
 
   const cancel = useCallback(() => {
     speechIdRef.current += 1;
@@ -65,7 +93,7 @@ export function useSpeechSynthesis({
           return;
         }
 
-        // Stop a previous utterance before starting a new one.
+        // Invalidate previous speech.
         speechIdRef.current += 1;
 
         window.speechSynthesis.cancel();
@@ -82,10 +110,12 @@ export function useSpeechSynthesis({
         utterance.pitch = pitch;
         utterance.volume = volume;
 
-        const preferredVoice = findPreferredVoice(language);
+        const selectedVoice =
+          voices.find((voice) => voice.voiceURI === voiceURI) ??
+          findPreferredVoice(language);
 
-        if (preferredVoice) {
-          utterance.voice = preferredVoice;
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
         }
 
         activeResolveRef.current = resolve;
@@ -96,6 +126,7 @@ export function useSpeechSynthesis({
           }
 
           setIsSpeaking(true);
+
           callbacks?.onStart?.();
         };
 
@@ -131,7 +162,7 @@ export function useSpeechSynthesis({
         window.speechSynthesis.speak(utterance);
       });
     },
-    [language, pitch, rate, volume],
+    [language, pitch, rate, voiceURI, voices, volume],
   );
 
   useEffect(() => {
@@ -143,12 +174,14 @@ export function useSpeechSynthesis({
       }
 
       activeResolveRef.current?.();
+
       activeResolveRef.current = null;
     };
   }, []);
 
   return {
     isSpeaking,
+    voices,
     speak,
     cancel,
   };
