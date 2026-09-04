@@ -30,7 +30,7 @@ export function KnowledgeSourceTray(props: KnowledgeSourceTrayProps) {
         <span className="h-1.5 w-1.5 rounded-full bg-cyan-300/60" />
         RAG debug
         <span className="font-mono text-cyan-300/45">
-          {debug.selectedCount}
+          {debug.selectedCount}/{debug.candidateCount}
         </span>
       </button>
 
@@ -38,11 +38,29 @@ export function KnowledgeSourceTray(props: KnowledgeSourceTrayProps) {
         <div className="mt-2 rounded-2xl border border-cyan-400/10 bg-cyan-400/[0.02] p-3">
           <div className="grid grid-cols-3 gap-2">
             <Metric label="Threshold" value={debug.threshold.toFixed(2)} />
+            <Metric label="Candidates" value={String(debug.candidateCount)} />
             <Metric label="Selected" value={String(debug.selectedCount)} />
             <Metric
-              label="Semantic"
-              value={debug.semanticAvailable ? "Ready" : "Fallback"}
+              label="Documents"
+              value={String(debug.uniqueDocumentCount)}
             />
+            <Metric label="Per source" value={String(debug.perDocumentLimit)} />
+            <Metric label="Deduped" value={String(debug.duplicateCount)} />
+          </div>
+
+          <div className="mt-2 flex items-center justify-between rounded-xl border border-white/[0.04] bg-black/10 px-2.5 py-2">
+            <span className="text-[8px] text-slate-700">
+              Semantic retrieval
+            </span>
+            <span
+              className={`text-[8px] ${
+                debug.semanticAvailable
+                  ? "text-emerald-300/60"
+                  : "text-amber-300/60"
+              }`}
+            >
+              {debug.semanticAvailable ? "Ready" : "Fallback"}
+            </span>
           </div>
 
           <p className="mt-3 line-clamp-2 text-[9px] leading-4 text-slate-600">
@@ -50,19 +68,30 @@ export function KnowledgeSourceTray(props: KnowledgeSourceTrayProps) {
           </p>
 
           {debug.sources.length > 0 ? (
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-1.5">
               {debug.sources.map((source) => (
                 <div
                   key={source.chunkId}
-                  className="flex items-center justify-between gap-3 rounded-lg bg-black/10 px-2.5 py-1.5 text-[8px]"
+                  className="rounded-lg bg-black/10 px-2.5 py-2 text-[8px]"
                 >
-                  <span className="min-w-0 truncate text-slate-600">
-                    [{source.id}] {source.filename} · chunk {source.chunkIndex}
-                  </span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-slate-600">
+                      [{source.id}] {source.filename} · chunk{" "}
+                      {source.chunkIndex}
+                    </span>
 
-                  <span className="shrink-0 font-mono text-cyan-300/60">
-                    {source.similarity.toFixed(3)}
-                  </span>
+                    <span className="shrink-0 font-mono text-cyan-300/60">
+                      {source.rankScore.toFixed(3)}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[7px] text-slate-700">
+                    <span>semantic {source.similarity.toFixed(3)}</span>
+                    <span>redundancy {source.redundancy.toFixed(3)}</span>
+                    {source.reasons.map((reason) => (
+                      <span key={reason}>{reason}</span>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

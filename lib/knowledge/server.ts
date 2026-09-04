@@ -1,4 +1,8 @@
 import { embedKnowledgeQuery } from "@/lib/knowledge/embedding";
+import {
+  rerankKnowledgeCandidates,
+  type KnowledgeRetrievalCandidate,
+} from "@/lib/knowledge/retrieval";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   KnowledgeContextResult,
@@ -7,7 +11,8 @@ import type {
 } from "@/types/knowledge";
 
 const KNOWLEDGE_MATCH_THRESHOLD = 0.42;
-const KNOWLEDGE_MATCH_COUNT = 6;
+const KNOWLEDGE_CANDIDATE_COUNT = 12;
+const KNOWLEDGE_SELECTION_COUNT = 6;
 
 interface KnowledgeMatchRow {
   chunk_id: string;
@@ -26,7 +31,11 @@ function emptyDebug(
   return {
     query,
     threshold: KNOWLEDGE_MATCH_THRESHOLD,
+    candidateCount: 0,
     selectedCount: 0,
+    uniqueDocumentCount: 0,
+    perDocumentLimit: KNOWLEDGE_SELECTION_COUNT,
+    duplicateCount: 0,
     semanticAvailable,
     sources: [],
   };
@@ -71,16 +80,15 @@ export async function getKnowledgeContext(
     const { data, error } = await supabase.rpc("match_knowledge_chunks", {
       query_embedding: queryEmbedding,
       match_threshold: KNOWLEDGE_MATCH_THRESHOLD,
-      match_count: KNOWLEDGE_MATCH_COUNT,
+      match_count: KNOWLEDGE_CANDIDATE_COUNT,
     });
 
     if (error) {
       throw error;
     }
 
-    const sources = ((data ?? []) as KnowledgeMatchRow[]).map(
-      (row, index): KnowledgeSource => ({
-        id: `K${index + 1}`,
+    const rawCandidates = ((data ?? []) as KnowledgeMatchRow[]).map(
+      (row): KnowledgeRetrievalCandidate => ({
         chunkId: row.chunk_id,
         documentId: row.document_id,
         filename: row.filename,
@@ -91,19 +99,44 @@ export async function getKnowledgeContext(
       }),
     );
 
+    const reranked = rerankKnowledgeCandidates(
+      rawCandidates,
+      KNOWLEDGE_SELECTION_COUNT,
+    );
+
+    const sources = reranked.selected.map(
+      (candidate, index): KnowledgeSource => ({
+        id: `K${index + 1}`,
+        chunkId: candidate.chunkId,
+        documentId: candidate.documentId,
+        filename: candidate.filename,
+        pageNumber: candidate.pageNumber,
+        chunkIndex: candidate.chunkIndex,
+        content: candidate.content,
+        similarity: candidate.similarity,
+      }),
+    );
+
     const debug: KnowledgeRetrievalDebug = {
       query: normalizedQuery,
       threshold: KNOWLEDGE_MATCH_THRESHOLD,
+      candidateCount: reranked.candidateCount,
       selectedCount: sources.length,
+      uniqueDocumentCount: reranked.uniqueDocumentCount,
+      perDocumentLimit: reranked.perDocumentLimit,
+      duplicateCount: reranked.duplicateCount,
       semanticAvailable: true,
-      sources: sources.map((source) => ({
-        id: source.id,
-        chunkId: source.chunkId,
-        documentId: source.documentId,
-        filename: source.filename,
-        pageNumber: source.pageNumber,
-        chunkIndex: source.chunkIndex,
-        similarity: source.similarity,
+      sources: reranked.selected.map((candidate, index) => ({
+        id: `K${index + 1}`,
+        chunkId: candidate.chunkId,
+        documentId: candidate.documentId,
+        filename: candidate.filename,
+        pageNumber: candidate.pageNumber,
+        chunkIndex: candidate.chunkIndex,
+        similarity: candidate.similarity,
+        rankScore: candidate.rankScore,
+        redundancy: candidate.redundancy,
+        reasons: candidate.reasons,
       })),
     };
 
@@ -133,6 +166,9 @@ Rules for using these sources:
 - When you use information from a source, cite it inline with its exact marker, such as [K1].
 - Never invent source markers or cite a source that is not listed below.
 - Prefer the uploaded sources over unsupported guesses when the question is about their content.
+- If multiple sources support a claim, cite the smallest useful set of markers, for example [K1][K2].
+- Do not cite a source merely because it was retrieved; cite only sources that actually support the statement.
+- If the sources disagree, describe the disagreement and cite the conflicting sources separately.
 - If the sources do not contain enough information, say that clearly.
 - Do not mention embeddings, vector search, retrieval internals, or database implementation unless the user asks.
 
@@ -149,6 +185,8 @@ ${formattedSources}
           page: source.pageNumber,
           chunk: source.chunkIndex,
           similarity: Number(source.similarity.toFixed(3)),
+          rankScore: Number(source.rankScore.toFixed(3)),
+          redundancy: Number(source.redundancy.toFixed(3)),
         })),
       );
     }

@@ -1,36 +1,38 @@
-# NARA Knowledge / RAG v1.2
+# NARA Knowledge / RAG v1.5 — Citation Integrity
 
-Adds two durability features on top of v1.1:
+This patch adds a deterministic citation guard after the streamed assistant answer completes.
 
-- **Original private document storage** in a Supabase Storage bucket (`knowledge-files`).
-  - New uploads keep the original PDF/TXT/Markdown privately.
-  - Source preview can create a short-lived signed URL and open the original document.
-  - Deleting a knowledge document also attempts to remove the original file.
-- **Persistent citations per assistant message** via `messages.knowledge_citations` JSONB.
-  - Citation metadata survives refresh/history loading.
-  - The latest sourced assistant response restores the source tray after opening a saved conversation.
+## What changes
 
-Existing documents indexed before v1.2 do not have an original file. Re-upload them if you want the **Open original** action.
+- Only source markers actually used in the final answer are persisted with the assistant message.
+- Hallucinated markers such as `[K99]` are removed when they were not part of retrieval.
+- Citation IDs are normalized (`[k1]` → `[K1]`).
+- Repeated source markers keep one citation metadata record.
+- Assistant bubble citation chips are updated immediately after streaming, not only after history reload.
+- Development logs flag cases where sources were retrieved but the model cited none of them.
+- Adds `pnpm knowledge:citations` regression tests.
+
+No Supabase migration is required.
 
 ## Apply
 
-1. Extract the ZIP into the NARA repository root with overwrite enabled.
-2. Run:
-
 ```powershell
-node scripts\apply-knowledge-rag-v12.mjs
+Expand-Archive `
+  -Path "$HOME\Downloads\nara-rag-v1.5-patch.zip" `
+  -DestinationPath . `
+  -Force
+
+node scripts\apply-knowledge-rag-v15.mjs
 ```
 
-3. Run migration:
-
-`supabase/migrations/20260904163000_knowledge_storage_and_persistent_citations.sql`
-
-4. Validate:
+## Validate
 
 ```powershell
 pnpm format
 pnpm lint
 pnpm typecheck
 pnpm memory:eval
+pnpm knowledge:eval
+pnpm knowledge:citations
 pnpm build
 ```

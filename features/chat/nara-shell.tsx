@@ -25,6 +25,7 @@ import {
   deleteConversation,
   renameConversation,
 } from "@/lib/conversations/persistence";
+import { reconcileKnowledgeCitations } from "@/lib/knowledge/citations";
 import {
   createMemory,
   deleteMemory,
@@ -739,13 +740,50 @@ export function NaraShell() {
 
         return;
       }
+      const citationIntegrity = reconcileKnowledgeCitations(
+        assistantContent,
+        responseKnowledgeSources,
+      );
+
+      assistantContent = citationIntegrity.content;
+      responseKnowledgeSources = citationIntegrity.citations;
+
+      setKnowledgeSources(citationIntegrity.citations);
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: citationIntegrity.content,
+                knowledgeCitations: citationIntegrity.citations,
+              }
+            : message,
+        ),
+      );
+
+      if (process.env.NODE_ENV === "development") {
+        if (citationIntegrity.invalidCitationIds.length > 0) {
+          console.warn(
+            "[NARA] Removed invalid knowledge citation markers:",
+            citationIntegrity.invalidCitationIds,
+          );
+        }
+
+        if (citationIntegrity.retrievedButUncited) {
+          console.warn(
+            "[NARA] Knowledge sources were retrieved but the final response did not cite them.",
+            citationIntegrity.unusedRetrievedIds,
+          );
+        }
+      }
 
       const assistantMessage: ConversationMessage = {
         id: assistantId,
         role: "assistant",
-        content: assistantContent,
+        content: citationIntegrity.content,
         createdAt: assistantCreatedAt,
-        knowledgeCitations: responseKnowledgeSources,
+        knowledgeCitations: citationIntegrity.citations,
       };
 
       if (conversationId) {

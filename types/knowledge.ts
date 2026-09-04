@@ -36,12 +36,22 @@ export interface KnowledgeCitation {
   similarity: number;
 }
 
+export interface KnowledgeRetrievalDebugSource extends KnowledgeCitation {
+  rankScore: number;
+  redundancy: number;
+  reasons: string[];
+}
+
 export interface KnowledgeRetrievalDebug {
   query: string;
   threshold: number;
+  candidateCount: number;
   selectedCount: number;
+  uniqueDocumentCount: number;
+  perDocumentLimit: number;
+  duplicateCount: number;
   semanticAvailable: boolean;
-  sources: KnowledgeCitation[];
+  sources: KnowledgeRetrievalDebugSource[];
 }
 
 export interface KnowledgeContextResult {
