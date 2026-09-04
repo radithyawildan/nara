@@ -1,9 +1,8 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 import { streamConversation } from "@/lib/ai/orchestrator";
-
 import { getAIProvider } from "@/lib/ai/provider-factory";
-
+import { getKnowledgeContext } from "@/lib/knowledge/server";
 import { getMemoryContext } from "@/lib/memory/server";
 
 const requestSchema = z.object({
@@ -11,7 +10,6 @@ const requestSchema = z.object({
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
-
         content: z.string().trim().min(1).max(8_000),
       }),
     )
@@ -33,26 +31,15 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json(
-      {
-        error: "Invalid JSON body.",
-      },
-      {
-        status: 400,
-      },
-    );
+    return Response.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
   const result = requestSchema.safeParse(body);
 
   if (!result.success) {
     return Response.json(
-      {
-        error: "Invalid conversation payload.",
-      },
-      {
-        status: 400,
-      },
+      { error: "Invalid conversation payload." },
+      { status: 400 },
     );
   }
 
@@ -63,14 +50,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[NARA] Provider configuration error:", error);
 
-    return Response.json(
-      {
-        error: getErrorMessage(error),
-      },
-      {
-        status: 500,
-      },
-    );
+    return Response.json({ error: getErrorMessage(error) }, { status: 500 });
   }
 
   try {
@@ -79,26 +59,30 @@ export async function POST(request: Request) {
         .reverse()
         .find((message) => message.role === "user")?.content ?? "";
 
-    const memoryResult = await getMemoryContext(latestUserMessage);
+    const [memoryResult, knowledgeResult] = await Promise.all([
+      getMemoryContext(latestUserMessage),
+      getKnowledgeContext(latestUserMessage),
+    ]);
+
+    const additionalInstructions = [
+      memoryResult.context,
+      knowledgeResult.context,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
 
     const conversation = streamConversation(provider, result.data.messages, {
       signal: request.signal,
-
-      additionalInstructions: memoryResult.context || undefined,
+      additionalInstructions: additionalInstructions || undefined,
     });
 
     const iterator = conversation[Symbol.asyncIterator]();
-
     const first = await iterator.next();
 
     if (first.done) {
       return Response.json(
-        {
-          error: "AI provider returned an empty response.",
-        },
-        {
-          status: 502,
-        },
+        { error: "AI provider returned an empty response." },
+        { status: 502 },
       );
     }
 
@@ -125,7 +109,6 @@ export async function POST(request: Request) {
             "[NARA] Conversation stream failed after start:",
             error,
           );
-
           controller.close();
         }
       },
@@ -139,7 +122,6 @@ export async function POST(request: Request) {
 
     const headers = new Headers({
       "Content-Type": "text/plain; charset=utf-8",
-
       "Cache-Control": "no-cache, no-store",
     });
 
@@ -154,19 +136,10 @@ export async function POST(request: Request) {
       }
     }
 
-    return new Response(stream, {
-      headers,
-    });
+    return new Response(stream, { headers });
   } catch (error) {
     console.error("[NARA] Conversation provider failed:", error);
 
-    return Response.json(
-      {
-        error: getErrorMessage(error),
-      },
-      {
-        status: 502,
-      },
-    );
+    return Response.json({ error: getErrorMessage(error) }, { status: 502 });
   }
 }

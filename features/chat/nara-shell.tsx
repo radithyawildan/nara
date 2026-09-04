@@ -8,6 +8,7 @@ import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
+import { KnowledgeCenter } from "@/features/knowledge/knowledge-center";
 import { MemoryDebugInspector } from "@/features/memory/memory-debug-inspector";
 import { MemorySuggestionCard } from "@/features/memory/memory-suggestion-card";
 import { NaraSidebar } from "@/features/navigation/nara-sidebar";
@@ -65,6 +66,25 @@ function SettingsIcon() {
       <circle cx="12" cy="12" r="3" />
 
       <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.6v-.1a1.7 1.7 0 0 0-1.4-1.6 1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 3.8 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2V9.6h.1A1.7 1.7 0 0 0 3.7 8.2a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8 3.8a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V2h4v.1A1.7 1.7 0 0 0 14.8 3.7a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.2 8a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4h-.1a1.7 1.7 0 0 0-1.5 1.6Z" />
+    </svg>
+  );
+}
+
+function KnowledgeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H19v17H7.5A2.5 2.5 0 0 0 5 21.5V4.5Z" />
+      <path d="M5 4.5A2.5 2.5 0 0 0 2.5 7v12A2.5 2.5 0 0 0 5 21.5" />
+      <path d="M9 7h6M9 11h6" />
     </svg>
   );
 }
@@ -129,6 +149,8 @@ export function NaraShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [memoryCenterOpen, setMemoryCenterOpen] = useState(false);
+
+  const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
 
   const [autoSpeak, setAutoSpeak] = useState(true);
 
@@ -477,6 +499,7 @@ export function NaraShell() {
     setErrorMessage(null);
     setSettingsOpen(false);
     setMemoryCenterOpen(false);
+    setKnowledgeCenterOpen(false);
     setIsGenerating(true);
 
     if (source === "text") {
@@ -953,6 +976,21 @@ export function NaraShell() {
               disabled={!persistenceAvailable}
               onClick={() => {
                 setSettingsOpen(false);
+                setMemoryCenterOpen(false);
+                setKnowledgeCenterOpen(true);
+              }}
+              aria-label="Open Knowledge Center"
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-cyan-400/20 hover:bg-cyan-400/[0.08] hover:text-white disabled:opacity-30"
+            >
+              <KnowledgeIcon />
+            </button>
+
+            <button
+              type="button"
+              disabled={!persistenceAvailable}
+              onClick={() => {
+                setSettingsOpen(false);
+                setKnowledgeCenterOpen(false);
 
                 setMemoryCenterOpen(true);
               }}
@@ -979,6 +1017,7 @@ export function NaraShell() {
               aria-expanded={settingsOpen}
               onClick={() => {
                 setMemoryCenterOpen(false);
+                setKnowledgeCenterOpen(false);
 
                 setSettingsOpen((current) => !current);
               }}
@@ -1016,6 +1055,7 @@ export function NaraShell() {
               onNewChat={handleNewChat}
               onOpenMemories={() => {
                 setSettingsOpen(false);
+                setKnowledgeCenterOpen(false);
 
                 setMemoryCenterOpen(true);
               }}
@@ -1137,6 +1177,11 @@ export function NaraShell() {
           </div>
         </section>
       </div>
+
+      <KnowledgeCenter
+        open={knowledgeCenterOpen}
+        onClose={() => setKnowledgeCenterOpen(false)}
+      />
 
       <MemoryDebugInspector debug={memoryDebug} />
 
