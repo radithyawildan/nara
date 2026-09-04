@@ -16,6 +16,17 @@ import { KnowledgeSourceTray } from "@/features/knowledge/knowledge-source-tray"
 import { MemoryDebugInspector } from "@/features/memory/memory-debug-inspector";
 import { MemorySuggestionCard } from "@/features/memory/memory-suggestion-card";
 import { NaraSidebar } from "@/features/navigation/nara-sidebar";
+import { RuntimeStatus } from "@/features/system/runtime-status";
+import {
+  ControlCenterIcon,
+  SettingsHub,
+} from "@/features/settings/settings-hub";
+import { FirstRunOnboarding } from "@/features/onboarding/first-run-onboarding";
+import {
+  HistoryMenuIcon,
+  MobileHistoryDrawer,
+} from "@/features/navigation/mobile-history-drawer";
+import { NaraCommandPalette } from "@/features/experience/command-palette";
 import { VoiceSettings } from "@/features/settings/voice-settings";
 import { useSpeechRecognition } from "@/features/voice/use-speech-recognition";
 import { useSpeechSynthesis } from "@/features/voice/use-speech-synthesis";
@@ -215,6 +226,10 @@ export function NaraShell() {
   const [memoryError, setMemoryError] = useState<string | null>(null);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+
+  const [settingsHubOpen, setSettingsHubOpen] = useState(false);
 
   const [memoryCenterOpen, setMemoryCenterOpen] = useState(false);
 
@@ -1159,6 +1174,18 @@ export function NaraShell() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              aria-label="Open conversation history"
+              onClick={() => {
+                setSettingsHubOpen(false);
+                setMobileHistoryOpen(true);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-violet-400/20 hover:bg-violet-400/[0.08] hover:text-white xl:hidden"
+            >
+              <HistoryMenuIcon />
+            </button>
+
+            <button
+              type="button"
               disabled={!persistenceAvailable}
               onClick={() => {
                 setSettingsOpen(false);
@@ -1194,10 +1221,7 @@ export function NaraShell() {
               )}
             </button>
 
-            <div className="hidden items-center gap-2 rounded-full border border-emerald-400/15 bg-emerald-400/[0.05] px-3 py-2 text-xs text-emerald-300 sm:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-              Online
-            </div>
+            <RuntimeStatus />
 
             <button
               type="button"
@@ -1230,6 +1254,20 @@ export function NaraShell() {
               className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-violet-400/20 hover:bg-violet-400/[0.08] hover:text-white"
             >
               <PersonalityIcon />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Open NARA controls"
+              aria-expanded={settingsHubOpen}
+              onClick={() => {
+                setSettingsOpen(false);
+                setMobileHistoryOpen(false);
+                setSettingsHubOpen(true);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-violet-400/20 hover:bg-violet-400/[0.08] hover:text-white"
+            >
+              <ControlCenterIcon />
             </button>
 
             <button
@@ -1441,6 +1479,46 @@ export function NaraShell() {
       <PersonalityCenter
         open={personalityCenterOpen}
         onClose={() => setPersonalityCenterOpen(false)}
+      />
+
+      <MobileHistoryDrawer
+        open={mobileHistoryOpen}
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        disabled={isBusy}
+        loading={historyLoading}
+        onClose={() => setMobileHistoryOpen(false)}
+        onNewChat={handleNewChat}
+        onSelectConversation={(conversationId) => {
+          void handleSelectConversation(conversationId);
+        }}
+      />
+
+      <SettingsHub
+        open={settingsHubOpen}
+        onClose={() => setSettingsHubOpen(false)}
+        onOpenVoice={() => setSettingsOpen(true)}
+        onOpenMemory={() => setMemoryCenterOpen(true)}
+        onOpenKnowledge={() => {
+          setKnowledgeCenterOpen(true);
+        }}
+        onOpenPersonality={() => {
+          setPersonalityCenterOpen(true);
+        }}
+        onOpenAccount={() => {
+          setAccountCenterOpen(true);
+        }}
+      />
+
+      <NaraCommandPalette
+        onNewChat={handleNewChat}
+        onOpenHistory={() => setMobileHistoryOpen(true)}
+        onOpenControls={() => setSettingsHubOpen(true)}
+      />
+
+      <FirstRunOnboarding
+        onOpenControls={() => setSettingsHubOpen(true)}
+        onOpenHistory={() => setMobileHistoryOpen(true)}
       />
     </main>
   );
