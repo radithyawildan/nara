@@ -15,7 +15,7 @@ const requestSchema = z.object({
       }),
     )
     .min(1)
-    .max(40),
+    .max(160),
 });
 
 function getErrorMessage(error: unknown) {

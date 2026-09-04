@@ -13,7 +13,8 @@
     "memory:eval": "tsx scripts/evaluate-memory-retrieval.ts",
     "knowledge:eval": "tsx scripts/evaluate-knowledge-retrieval.ts",
     "knowledge:citations": "tsx scripts/evaluate-knowledge-citations.ts",
-    "personality:eval": "tsx scripts/evaluate-personality-context.ts"
+    "personality:eval": "tsx scripts/evaluate-personality-context.ts",
+    "conversation:eval": "tsx scripts/evaluate-conversation-intelligence.ts"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",

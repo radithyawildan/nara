@@ -1,22 +1,29 @@
-# NARA Adaptive Context v1.1
+# NARA Conversation Intelligence v1
 
 Adds:
 
-- Personality quick presets
-- Explicit context conflict-resolution hierarchy
-- Development-only Adaptive Context Inspector
-- `pnpm personality:eval` regression gate
-- No database migration
+- long-thread context compaction
+- lightweight token-budget estimation
+- deterministic earlier-conversation continuity summary
+- recent-message preservation
+- larger API history envelope (up to 160 messages)
+- development compaction logs
+- `pnpm conversation:eval` regression gate
+- no database migration
+
+The first version intentionally does not call an extra LLM just to summarize
+history. That keeps latency/cost predictable. A later version can persist a
+model-generated rolling summary if needed.
 
 Apply:
 
 ```powershell
 Expand-Archive `
-  -Path "$HOME\Downloads\nara-personality-v1.1-patch.zip" `
+  -Path "$HOME\Downloads\nara-conversation-intelligence-v1-patch.zip" `
   -DestinationPath . `
   -Force
 
-node scripts\apply-personality-v11.mjs
+node scripts\apply-conversation-intelligence-v1.mjs
 ```
 
 Validate:
@@ -29,5 +36,6 @@ pnpm memory:eval
 pnpm knowledge:eval
 pnpm knowledge:citations
 pnpm personality:eval
+pnpm conversation:eval
 pnpm build
 ```
