@@ -4,6 +4,7 @@ import { streamConversation } from "@/lib/ai/orchestrator";
 import { getAIProvider } from "@/lib/ai/provider-factory";
 import { getKnowledgeContext } from "@/lib/knowledge/server";
 import { getMemoryContext } from "@/lib/memory/server";
+import { getPersonalityInstructions } from "@/lib/personality/server";
 
 const requestSchema = z.object({
   messages: z
@@ -71,9 +72,14 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .join("\n\n");
 
+    const personalityInstructions = await getPersonalityInstructions();
+
     const conversation = streamConversation(provider, result.data.messages, {
       signal: request.signal,
-      additionalInstructions: additionalInstructions || undefined,
+      additionalInstructions:
+        [personalityInstructions, additionalInstructions || undefined]
+          .filter((value): value is string => Boolean(value))
+          .join("\n\n") || undefined,
     });
 
     const iterator = conversation[Symbol.asyncIterator]();

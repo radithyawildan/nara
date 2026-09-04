@@ -6,6 +6,7 @@ import { backfillMemoryEmbeddings } from "@/lib/memory/client";
 import { avatarReducer } from "@/features/avatar/avatar-machine";
 import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { AccountCenter } from "@/features/account/account-center";
+import { PersonalityCenter } from "@/features/personality/personality-center";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
@@ -147,6 +148,28 @@ function AccountIcon() {
 
 import type { MemoryRetrievalDebug } from "@/types/memory-debug";
 
+function PersonalityIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="8" />
+      <path d="M8.5 10h.01" />
+      <path d="M15.5 10h.01" />
+      <path d="M8.5 15c1.1 1 2.25 1.5 3.5 1.5s2.4-.5 3.5-1.5" />
+      <path d="M12 4V2" />
+      <path d="m18 6 1.4-1.4" />
+    </svg>
+  );
+}
+
 export function NaraShell() {
   const [avatarState, dispatch] = useReducer(avatarReducer, "idle");
 
@@ -195,6 +218,8 @@ export function NaraShell() {
   const [memoryCenterOpen, setMemoryCenterOpen] = useState(false);
 
   const [accountCenterOpen, setAccountCenterOpen] = useState(false);
+
+  const [personalityCenterOpen, setPersonalityCenterOpen] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1189,6 +1214,25 @@ export function NaraShell() {
 
             <button
               type="button"
+              aria-label="Open Personality Center"
+              aria-expanded={personalityCenterOpen}
+              onClick={() => {
+                setSettingsOpen(false);
+                setMemoryCenterOpen(false);
+
+                setKnowledgeCenterOpen(false);
+
+                setAccountCenterOpen(false);
+
+                setPersonalityCenterOpen(true);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-violet-400/20 hover:bg-violet-400/[0.08] hover:text-white"
+            >
+              <PersonalityIcon />
+            </button>
+
+            <button
+              type="button"
               aria-label="Open voice settings"
               aria-expanded={settingsOpen}
               onClick={() => {
@@ -1390,6 +1434,10 @@ export function NaraShell() {
         onUpdate={handleUpdateMemory}
         onToggle={handleToggleMemory}
         onDelete={handleDeleteMemory}
+      />
+      <PersonalityCenter
+        open={personalityCenterOpen}
+        onClose={() => setPersonalityCenterOpen(false)}
       />
     </main>
   );

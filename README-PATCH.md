@@ -1,34 +1,33 @@
-# NARA Account & Identity v1.2
+# NARA Personality & Adaptive Context v1
 
-Adds server-side account administration without exposing Supabase admin credentials to the browser.
+Adds:
 
-## Features
+- user-configurable NARA personality profile
+- tone, language, verbosity, initiative, code style, emoji preference
+- Supabase Auth user_metadata persistence
+- server-side adaptive personality prompt
+- Personality Center UI
+- no database migration required
 
-- Anonymous → existing-account merge
-- Explicit "discard temporary data" alternative
-- Ownership transfer for conversations, messages, memories, knowledge documents/chunks
-- Private knowledge file path migration
-- Persistent citation IDs remain valid because document/chunk IDs are preserved
-- Password-confirmed permanent account deletion
-- Private knowledge file cleanup before deletion
-- Server-only Supabase secret/service-role client
+Apply from repository root:
 
-## Required environment
+```powershell
+Expand-Archive `
+  -Path "$HOME\Downloads\nara-personality-v1-patch.zip" `
+  -DestinationPath . `
+  -Force
 
-Add **one** of these to `.env.local` and never expose it through a `NEXT_PUBLIC_` variable:
-
-```env
-SUPABASE_SECRET_KEY=
-# or legacy:
-SUPABASE_SERVICE_ROLE_KEY=
+node scripts\apply-personality-v1.mjs
 ```
 
-Do not paste this key into chat, source control, browser code, or `.env.example` with a real value.
+Then:
 
-## Required migration
-
-Run:
-
-`supabase/migrations/20260904214500_account_merge_and_deletion.sql`
-
-The RPC functions are revoked from browser roles and executable only by `service_role`.
+```powershell
+pnpm format
+pnpm lint
+pnpm typecheck
+pnpm memory:eval
+pnpm knowledge:eval
+pnpm knowledge:citations
+pnpm build
+```
