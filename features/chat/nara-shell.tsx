@@ -20,6 +20,8 @@ import {
   listConversations,
   loadConversationMessages,
   saveConversationMessage,
+  deleteConversation,
+  renameConversation,
 } from "@/lib/conversations/persistence";
 import {
   createMemory,
@@ -794,6 +796,93 @@ export function NaraShell() {
     });
   }
 
+  async function handleRenameConversation(
+    conversationId: string,
+    title: string,
+  ) {
+    setErrorMessage(null);
+
+    try {
+      const updatedConversation = await renameConversation(
+        conversationId,
+        title,
+      );
+
+      if (!updatedConversation) {
+        return;
+      }
+
+      setConversations((current) => [
+        updatedConversation,
+        ...current.filter((conversation) => conversation.id !== conversationId),
+      ]);
+    } catch (error) {
+      console.error("[NARA] Failed to rename conversation:", error);
+
+      throw error;
+    }
+  }
+
+  async function handleDeleteConversation(conversationId: string) {
+    setErrorMessage(null);
+
+    try {
+      await deleteConversation(conversationId);
+
+      const remainingConversations = conversations.filter(
+        (conversation) => conversation.id !== conversationId,
+      );
+
+      setConversations(remainingConversations);
+
+      if (conversationId !== activeConversationId) {
+        return;
+      }
+
+      setActiveConversationId(null);
+      setMessages([]);
+      setMemoryCandidate(null);
+      setMemoryDebug(null);
+
+      dispatch({
+        type: "RESET",
+      });
+
+      const fallbackConversation = remainingConversations[0];
+
+      if (!fallbackConversation) {
+        return;
+      }
+
+      setIsConversationLoading(true);
+
+      try {
+        const storedMessages = await loadConversationMessages(
+          fallbackConversation.id,
+        );
+
+        setActiveConversationId(fallbackConversation.id);
+
+        setMessages(storedMessages);
+      } catch (loadError) {
+        console.error(
+          "[NARA] Failed to load fallback conversation:",
+          loadError,
+        );
+
+        setErrorMessage(
+          "Conversation deleted, but the next conversation could not be loaded.",
+        );
+      } finally {
+        setIsConversationLoading(false);
+      }
+    } catch (error) {
+      console.error("[NARA] Failed to delete conversation:", error);
+
+      throw error;
+    }
+  }
+
   async function handleSelectConversation(conversationId: string) {
     if (isGenerating || isSpeaking || isListening || isConversationLoading) {
       return;
@@ -930,6 +1019,8 @@ export function NaraShell() {
 
                 setMemoryCenterOpen(true);
               }}
+              onRenameConversation={handleRenameConversation}
+              onDeleteConversation={handleDeleteConversation}
               onSelectConversation={(conversationId) => {
                 void handleSelectConversation(conversationId);
               }}
