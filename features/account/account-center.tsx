@@ -9,13 +9,15 @@ import {
   finishAnonymousAccountUpgrade,
   getCurrentAccount,
   sendPasswordRecovery,
-  signInToExistingAccount,
   signOutAllDevices,
   signOutCurrentDevice,
   signOutOtherDevices,
   subscribeToAccountChanges,
   updateAccountDisplayName,
   verifyAnonymousAccountEmail,
+  deleteNaraAccount,
+  discardTemporaryAccountAndSignIn,
+  mergeTemporaryAccountIntoExisting,
 } from "@/lib/account/client";
 
 import type { NaraAccountState } from "@/types/account";
@@ -27,7 +29,7 @@ interface AccountCenterProps {
 
 type UpgradeStep = "email" | "verify" | "password";
 type AnonymousMode = "upgrade" | "signin";
-type PersistentPanel = "profile" | "security" | "sessions";
+type PersistentPanel = "profile" | "security" | "sessions" | "danger";
 
 export function AccountCenter({ open, onClose }: AccountCenterProps) {
   const [account, setAccount] = useState<NaraAccountState | null>(null);
@@ -54,6 +56,9 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -202,14 +207,33 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
     setPending(true);
 
     try {
-      await signInToExistingAccount(email, signInPassword);
-      setNotice("Signed in. Reloading your cloud data...");
+      await mergeTemporaryAccountIntoExisting(email, signInPassword);
+      setNotice("Temporary data merged. Loading your persistent account...");
       window.setTimeout(() => window.location.reload(), 450);
     } catch (submitError) {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : "Could not sign in.",
+          : "Could not merge into the existing account.",
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function handleDiscardAndSignIn() {
+    resetMessages();
+    setPending(true);
+
+    try {
+      await discardTemporaryAccountAndSignIn(email, signInPassword);
+      setNotice("Temporary data discarded. Loading your existing account...");
+      window.setTimeout(() => window.location.reload(), 450);
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not discard the temporary account.",
       );
     } finally {
       setPending(false);
@@ -370,6 +394,29 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
     }
   }
 
+  async function handleDeleteAccount() {
+    resetMessages();
+
+    if (deleteConfirmation !== "DELETE") {
+      setError('Type "DELETE" exactly to confirm account deletion.');
+      return;
+    }
+
+    setPending(true);
+
+    try {
+      await deleteNaraAccount(deletePassword);
+      window.location.reload();
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Could not delete the NARA account.",
+      );
+      setPending(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[150] grid place-items-center bg-[#02040a]/75 px-4 py-6 backdrop-blur-md">
       <button
@@ -385,12 +432,12 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-slate-100">NARA Account</p>
               <span className="rounded-full border border-violet-400/15 bg-violet-400/[0.06] px-2 py-0.5 text-[8px] tracking-[0.12em] text-violet-300/70 uppercase">
-                Identity v1.1
+                Identity v1.2
               </span>
             </div>
 
             <p className="mt-1 text-[10px] leading-4 text-slate-600">
-              Recovery, password security, and cross-device session controls.
+              Account merge, recovery, session security, and permanent deletion.
             </p>
           </div>
 
@@ -567,7 +614,18 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
                     className={inputClassName}
                   />
 
-                  <PrimaryButton pending={pending}>Sign in</PrimaryButton>
+                  <PrimaryButton pending={pending}>
+                    Merge & sign in
+                  </PrimaryButton>
+
+                  <button
+                    type="button"
+                    disabled={pending || !email.trim() || !signInPassword}
+                    onClick={() => void handleDiscardAndSignIn()}
+                    className="w-full rounded-xl border border-white/[0.06] px-3 py-2 text-[10px] text-slate-500 transition hover:bg-white/[0.03] hover:text-slate-200 disabled:opacity-30"
+                  >
+                    Discard temporary data & sign in
+                  </button>
 
                   <button
                     type="button"
@@ -637,24 +695,26 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
               ) : (
                 <>
                   <div className="mt-4 flex rounded-xl border border-white/[0.06] bg-black/10 p-1">
-                    {(["profile", "security", "sessions"] as const).map(
-                      (panel) => (
-                        <TabButton
-                          key={panel}
-                          active={persistentPanel === panel}
-                          onClick={() => {
-                            resetMessages();
-                            setPersistentPanel(panel);
-                          }}
-                        >
-                          {panel === "profile"
-                            ? "Profile"
-                            : panel === "security"
-                              ? "Security"
-                              : "Sessions"}
-                        </TabButton>
-                      ),
-                    )}
+                    {(
+                      ["profile", "security", "sessions", "danger"] as const
+                    ).map((panel) => (
+                      <TabButton
+                        key={panel}
+                        active={persistentPanel === panel}
+                        onClick={() => {
+                          resetMessages();
+                          setPersistentPanel(panel);
+                        }}
+                      >
+                        {panel === "profile"
+                          ? "Profile"
+                          : panel === "security"
+                            ? "Security"
+                            : panel === "sessions"
+                              ? "Sessions"
+                              : "Danger"}
+                      </TabButton>
+                    ))}
                   </div>
 
                   {persistentPanel === "profile" && (
@@ -779,6 +839,54 @@ export function AccountCenter({ open, onClose }: AccountCenterProps) {
                     </div>
                   )}
                 </>
+              )}
+
+              {persistentPanel === "danger" && !recoveryMode && (
+                <div className="mt-4 space-y-3 rounded-2xl border border-red-400/15 bg-red-400/[0.035] p-4">
+                  <div>
+                    <p className="text-xs font-medium text-red-200">
+                      Delete NARA account
+                    </p>
+                    <p className="mt-1 text-[9px] leading-4 text-red-200/55">
+                      Permanently removes conversations, messages, long-term
+                      memories, knowledge chunks, citations, private source
+                      files, and this authentication identity. This action
+                      cannot be undone.
+                    </p>
+                  </div>
+
+                  <FieldLabel>Current password</FieldLabel>
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={deletePassword}
+                    onChange={(event) => setDeletePassword(event.target.value)}
+                    className={inputClassName}
+                  />
+
+                  <FieldLabel>Type DELETE to confirm</FieldLabel>
+                  <input
+                    value={deleteConfirmation}
+                    onChange={(event) =>
+                      setDeleteConfirmation(event.target.value)
+                    }
+                    placeholder="DELETE"
+                    className={inputClassName}
+                  />
+
+                  <button
+                    type="button"
+                    disabled={
+                      pending ||
+                      !deletePassword ||
+                      deleteConfirmation !== "DELETE"
+                    }
+                    onClick={() => void handleDeleteAccount()}
+                    className="w-full rounded-xl border border-red-400/20 bg-red-500/10 px-4 py-2.5 text-xs font-medium text-red-200 transition hover:bg-red-500/18 disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    {pending ? "Deleting..." : "Delete account permanently"}
+                  </button>
+                </div>
               )}
 
               <div className="mt-4 rounded-2xl border border-white/[0.06] bg-black/10 p-4">

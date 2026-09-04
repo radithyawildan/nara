@@ -1,38 +1,34 @@
-# NARA Account & Identity v1.1
+# NARA Account & Identity v1.2
 
-Adds:
+Adds server-side account administration without exposing Supabase admin credentials to the browser.
 
-- Forgot-password flow using Supabase password recovery email
-- Recovery deep-link: `/?account=recovery`
-- Password reset UI after recovery link
-- Change-password form with current password confirmation
-- Sign out current device (`scope: local`)
-- Sign out other devices while keeping current session (`scope: others`)
-- Sign out everywhere (`scope: global`)
-- Keeps Identity v1 anonymous -> permanent upgrade flow
+## Features
 
-No SQL migration is required.
+- Anonymous → existing-account merge
+- Explicit "discard temporary data" alternative
+- Ownership transfer for conversations, messages, memories, knowledge documents/chunks
+- Private knowledge file path migration
+- Persistent citation IDs remain valid because document/chunk IDs are preserved
+- Password-confirmed permanent account deletion
+- Private knowledge file cleanup before deletion
+- Server-only Supabase secret/service-role client
 
-## Apply
+## Required environment
 
-```powershell
-Expand-Archive `
-  -Path "$HOME\Downloads\nara-account-v1.1-patch.zip" `
-  -DestinationPath . `
-  -Force
+Add **one** of these to `.env.local` and never expose it through a `NEXT_PUBLIC_` variable:
 
-node scripts\apply-account-v11.mjs
+```env
+SUPABASE_SECRET_KEY=
+# or legacy:
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-Then run the normal quality gates.
+Do not paste this key into chat, source control, browser code, or `.env.example` with a real value.
 
-## Supabase configuration
+## Required migration
 
-Add your local and deployed recovery URLs to Supabase Auth Redirect URLs, for example:
+Run:
 
-- `http://localhost:3000/?account=recovery`
-- `https://your-domain.example/?account=recovery`
+`supabase/migrations/20260904214500_account_merge_and_deletion.sql`
 
-## Not included
-
-Account deletion is deliberately not implemented in browser code. Supabase `auth.admin.deleteUser()` requires a `service_role` credential and must only run on a trusted server. Account merge is also deferred because ownership transfer needs a transactional merge strategy.
+The RPC functions are revoked from browser roles and executable only by `service_role`.

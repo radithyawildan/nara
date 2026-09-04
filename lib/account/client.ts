@@ -282,3 +282,104 @@ export async function signOutAllDevices() {
 export async function signOutNaraAccount() {
   return signOutCurrentDevice();
 }
+
+interface AccountSwitchResponse {
+  accessToken?: string;
+  refreshToken?: string;
+  error?: string;
+  cleanupWarning?: string | null;
+}
+
+async function switchTemporaryAccount(
+  email: string,
+  password: string,
+  mode: "merge" | "discard",
+) {
+  const supabase = getClient();
+
+  const response = await fetch("/api/account/merge", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: email.trim().toLowerCase(),
+      password,
+      confirmation: "MERGE",
+      mode,
+    }),
+  });
+
+  const payload = (await response
+    .json()
+    .catch(() => null)) as AccountSwitchResponse | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? "Could not switch NARA accounts.");
+  }
+
+  if (!payload?.accessToken || !payload.refreshToken) {
+    throw new Error("The destination account session was not returned.");
+  }
+
+  const { data, error } = await supabase.auth.setSession({
+    access_token: payload.accessToken,
+    refresh_token: payload.refreshToken,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error("The destination NARA account could not be activated.");
+  }
+
+  if (payload.cleanupWarning) {
+    console.warn(
+      "[NARA] Account switch cleanup warning:",
+      payload.cleanupWarning,
+    );
+  }
+
+  return toAccountState(data.user);
+}
+
+export async function mergeTemporaryAccountIntoExisting(
+  email: string,
+  password: string,
+) {
+  return switchTemporaryAccount(email, password, "merge");
+}
+
+export async function discardTemporaryAccountAndSignIn(
+  email: string,
+  password: string,
+) {
+  return switchTemporaryAccount(email, password, "discard");
+}
+
+export async function deleteNaraAccount(password: string) {
+  const supabase = getClient();
+
+  const response = await fetch("/api/account/delete", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmation: "DELETE",
+      password,
+    }),
+  });
+
+  const payload = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error ?? "Could not delete the NARA account.");
+  }
+
+  await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+}
