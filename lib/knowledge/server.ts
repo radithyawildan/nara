@@ -2,8 +2,12 @@ import { embedKnowledgeQuery } from "@/lib/knowledge/embedding";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   KnowledgeContextResult,
+  KnowledgeRetrievalDebug,
   KnowledgeSource,
 } from "@/types/knowledge";
+
+const KNOWLEDGE_MATCH_THRESHOLD = 0.42;
+const KNOWLEDGE_MATCH_COUNT = 6;
 
 interface KnowledgeMatchRow {
   chunk_id: string;
@@ -15,6 +19,19 @@ interface KnowledgeMatchRow {
   similarity: number;
 }
 
+function emptyDebug(
+  query: string,
+  semanticAvailable = true,
+): KnowledgeRetrievalDebug {
+  return {
+    query,
+    threshold: KNOWLEDGE_MATCH_THRESHOLD,
+    selectedCount: 0,
+    semanticAvailable,
+    sources: [],
+  };
+}
+
 export async function getKnowledgeContext(
   query: string,
 ): Promise<KnowledgeContextResult> {
@@ -24,34 +41,37 @@ export async function getKnowledgeContext(
     return {
       context: "",
       sources: [],
+      debug: emptyDebug(query),
+    };
+  }
+
+  const supabase = await getSupabaseServerClient();
+
+  if (!supabase) {
+    return {
+      context: "",
+      sources: [],
+      debug: emptyDebug(normalizedQuery, false),
+    };
+  }
+
+  const { data: authData, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !authData.user) {
+    return {
+      context: "",
+      sources: [],
+      debug: emptyDebug(normalizedQuery, false),
     };
   }
 
   try {
-    const supabase = await getSupabaseServerClient();
-
-    if (!supabase) {
-      return {
-        context: "",
-        sources: [],
-      };
-    }
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authData.user) {
-      return {
-        context: "",
-        sources: [],
-      };
-    }
-
     const queryEmbedding = await embedKnowledgeQuery(normalizedQuery);
 
     const { data, error } = await supabase.rpc("match_knowledge_chunks", {
       query_embedding: queryEmbedding,
-      match_threshold: 0.42,
-      match_count: 6,
+      match_threshold: KNOWLEDGE_MATCH_THRESHOLD,
+      match_count: KNOWLEDGE_MATCH_COUNT,
     });
 
     if (error) {
@@ -61,6 +81,7 @@ export async function getKnowledgeContext(
     const sources = ((data ?? []) as KnowledgeMatchRow[]).map(
       (row, index): KnowledgeSource => ({
         id: `K${index + 1}`,
+        chunkId: row.chunk_id,
         documentId: row.document_id,
         filename: row.filename,
         pageNumber: row.page_number,
@@ -70,10 +91,27 @@ export async function getKnowledgeContext(
       }),
     );
 
+    const debug: KnowledgeRetrievalDebug = {
+      query: normalizedQuery,
+      threshold: KNOWLEDGE_MATCH_THRESHOLD,
+      selectedCount: sources.length,
+      semanticAvailable: true,
+      sources: sources.map((source) => ({
+        id: source.id,
+        chunkId: source.chunkId,
+        documentId: source.documentId,
+        filename: source.filename,
+        pageNumber: source.pageNumber,
+        chunkIndex: source.chunkIndex,
+        similarity: source.similarity,
+      })),
+    };
+
     if (sources.length === 0) {
       return {
         context: "",
         sources: [],
+        debug,
       };
     }
 
@@ -105,10 +143,11 @@ ${formattedSources}
     if (process.env.NODE_ENV === "development") {
       console.log(
         "[NARA] Knowledge retrieval:",
-        sources.map((source) => ({
+        debug.sources.map((source) => ({
           source: source.id,
           filename: source.filename,
           page: source.pageNumber,
+          chunk: source.chunkIndex,
           similarity: Number(source.similarity.toFixed(3)),
         })),
       );
@@ -117,6 +156,7 @@ ${formattedSources}
     return {
       context,
       sources,
+      debug,
     };
   } catch (error) {
     console.warn("[NARA] Knowledge retrieval unavailable:", error);
@@ -124,6 +164,7 @@ ${formattedSources}
     return {
       context: "",
       sources: [],
+      debug: emptyDebug(normalizedQuery, false),
     };
   }
 }

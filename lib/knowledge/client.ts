@@ -1,8 +1,10 @@
-﻿"use client";
+"use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-
-import type { KnowledgeDocument } from "@/types/knowledge";
+import type {
+  KnowledgeChunkPreview,
+  KnowledgeDocument,
+} from "@/types/knowledge";
 
 interface KnowledgeDocumentRow {
   id: string;
@@ -16,6 +18,14 @@ interface KnowledgeDocumentRow {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface KnowledgeChunkRow {
+  id: string;
+  document_id: string;
+  page_number: number | null;
+  chunk_index: number;
+  content: string;
 }
 
 interface KnowledgeMutationResponse {
@@ -36,6 +46,16 @@ function mapDocument(row: KnowledgeDocumentRow): KnowledgeDocument {
     errorMessage: row.error_message,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function mapChunk(row: KnowledgeChunkRow): KnowledgeChunkPreview {
+  return {
+    id: row.id,
+    documentId: row.document_id,
+    pageNumber: row.page_number,
+    chunkIndex: row.chunk_index,
+    content: row.content,
   };
 }
 
@@ -99,15 +119,9 @@ export async function listKnowledgeDocuments() {
 }
 
 export async function uploadKnowledgeDocument(file: File) {
-  /*
-   * Ensure the anonymous session exists
-   * before hitting the server route so
-   * Supabase SSR receives the auth cookie.
-   */
   await ensureKnowledgeUser();
 
   const formData = new FormData();
-
   formData.set("file", file);
 
   let response: Response;
@@ -119,7 +133,6 @@ export async function uploadKnowledgeDocument(file: File) {
     });
   } catch (error) {
     console.error("[NARA] Knowledge upload API unreachable:", error);
-
     throw new Error("Could not reach the Knowledge upload API.");
   }
 
@@ -139,10 +152,6 @@ export async function uploadKnowledgeDocument(file: File) {
 export async function deleteKnowledgeDocument(documentId: string) {
   const supabase = await ensureKnowledgeUser();
 
-  /*
-   * Deleting the document also removes its
-   * chunks through ON DELETE CASCADE.
-   */
   const { error } = await supabase
     .from("knowledge_documents")
     .delete()
@@ -151,4 +160,66 @@ export async function deleteKnowledgeDocument(documentId: string) {
   if (error) {
     throw error;
   }
+}
+
+export async function reindexKnowledgeDocument(documentId: string) {
+  await ensureKnowledgeUser();
+
+  const response = await fetch("/api/knowledge/reindex", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ documentId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
+  }
+
+  const payload = (await response.json()) as KnowledgeMutationResponse;
+
+  if (!payload.document) {
+    throw new Error("Knowledge re-indexing did not return a document.");
+  }
+
+  return payload.document;
+}
+
+export async function listKnowledgeDocumentChunks(
+  documentId: string,
+  limit = 12,
+) {
+  const supabase = await ensureKnowledgeUser();
+
+  const { data, error } = await supabase
+    .from("knowledge_chunks")
+    .select("id,document_id,page_number,chunk_index,content")
+    .eq("document_id", documentId)
+    .order("chunk_index", {
+      ascending: true,
+    })
+    .limit(Math.min(Math.max(limit, 1), 30));
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as KnowledgeChunkRow[]).map(mapChunk);
+}
+
+export async function getKnowledgeChunkPreview(chunkId: string) {
+  const supabase = await ensureKnowledgeUser();
+
+  const { data, error } = await supabase
+    .from("knowledge_chunks")
+    .select("id,document_id,page_number,chunk_index,content")
+    .eq("id", chunkId)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapChunk(data as KnowledgeChunkRow);
 }

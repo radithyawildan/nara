@@ -9,6 +9,7 @@ import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
 import { KnowledgeCenter } from "@/features/knowledge/knowledge-center";
+import { KnowledgeSourceTray } from "@/features/knowledge/knowledge-source-tray";
 import { MemoryDebugInspector } from "@/features/memory/memory-debug-inspector";
 import { MemorySuggestionCard } from "@/features/memory/memory-suggestion-card";
 import { NaraSidebar } from "@/features/navigation/nara-sidebar";
@@ -40,6 +41,10 @@ import type {
   ConversationSummary,
 } from "@/types/conversation";
 import type { MemoryCategory, NaraMemory } from "@/types/memory";
+import type {
+  KnowledgeCitation,
+  KnowledgeRetrievalDebug,
+} from "@/types/knowledge";
 
 type InputSource = "text" | "voice";
 
@@ -122,6 +127,13 @@ export function NaraShell() {
   const [memoryDebug, setMemoryDebug] = useState<MemoryRetrievalDebug | null>(
     null,
   );
+
+  const [knowledgeSources, setKnowledgeSources] = useState<KnowledgeCitation[]>(
+    [],
+  );
+
+  const [knowledgeDebug, setKnowledgeDebug] =
+    useState<KnowledgeRetrievalDebug | null>(null);
 
   const [memoryCandidate, setMemoryCandidate] =
     useState<MemoryCandidate | null>(null);
@@ -561,6 +573,47 @@ export function NaraShell() {
         signal: controller.signal,
       });
 
+      const encodedKnowledgeSources = response.headers.get(
+        "X-NARA-Knowledge-Sources",
+      );
+
+      if (encodedKnowledgeSources) {
+        try {
+          setKnowledgeSources(
+            JSON.parse(
+              decodeURIComponent(encodedKnowledgeSources),
+            ) as KnowledgeCitation[],
+          );
+        } catch (error) {
+          console.warn("[NARA] Could not parse knowledge citations:", error);
+          setKnowledgeSources([]);
+        }
+      } else {
+        setKnowledgeSources([]);
+      }
+
+      const encodedKnowledgeDebug = response.headers.get(
+        "X-NARA-Knowledge-Debug",
+      );
+
+      if (encodedKnowledgeDebug) {
+        try {
+          setKnowledgeDebug(
+            JSON.parse(
+              decodeURIComponent(encodedKnowledgeDebug),
+            ) as KnowledgeRetrievalDebug,
+          );
+        } catch (error) {
+          console.warn(
+            "[NARA] Could not parse knowledge debug metadata:",
+            error,
+          );
+          setKnowledgeDebug(null);
+        }
+      } else {
+        setKnowledgeDebug(null);
+      }
+
       const encodedMemoryDebug = response.headers.get("X-NARA-Memory-Debug");
 
       if (encodedMemoryDebug) {
@@ -813,6 +866,8 @@ export function NaraShell() {
     setMemoryCenterOpen(false);
     setMemoryCandidate(null);
     setMemoryDebug(null);
+    setKnowledgeSources([]);
+    setKnowledgeDebug(null);
 
     dispatch({
       type: "RESET",
@@ -918,6 +973,8 @@ export function NaraShell() {
     setIsConversationLoading(true);
 
     setErrorMessage(null);
+    setKnowledgeSources([]);
+    setKnowledgeDebug(null);
     cancelSpeech();
 
     dispatch({
@@ -1155,6 +1212,11 @@ export function NaraShell() {
                     }}
                   />
                 )}
+
+                <KnowledgeSourceTray
+                  sources={knowledgeSources}
+                  debug={knowledgeDebug}
+                />
 
                 <div className="shrink-0 border-t border-white/[0.06] pb-4 pt-4">
                   <Composer

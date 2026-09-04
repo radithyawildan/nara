@@ -16,6 +16,7 @@ export interface KnowledgeDocument {
 
 export interface KnowledgeSource {
   id: string;
+  chunkId: string;
   documentId: string;
   filename: string;
   pageNumber: number | null;
@@ -24,7 +25,34 @@ export interface KnowledgeSource {
   similarity: number;
 }
 
+export interface KnowledgeCitation {
+  id: string;
+  chunkId: string;
+  documentId: string;
+  filename: string;
+  pageNumber: number | null;
+  chunkIndex: number;
+  similarity: number;
+}
+
+export interface KnowledgeRetrievalDebug {
+  query: string;
+  threshold: number;
+  selectedCount: number;
+  semanticAvailable: boolean;
+  sources: KnowledgeCitation[];
+}
+
 export interface KnowledgeContextResult {
   context: string;
   sources: KnowledgeSource[];
+  debug: KnowledgeRetrievalDebug;
+}
+
+export interface KnowledgeChunkPreview {
+  id: string;
+  documentId: string;
+  pageNumber: number | null;
+  chunkIndex: number;
+  content: string;
 }

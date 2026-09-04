@@ -125,14 +125,43 @@ export async function POST(request: Request) {
       "Cache-Control": "no-cache, no-store",
     });
 
+    if (knowledgeResult.sources.length > 0) {
+      try {
+        const citations = knowledgeResult.sources.map((source) => ({
+          id: source.id,
+          chunkId: source.chunkId,
+          documentId: source.documentId,
+          filename: source.filename,
+          pageNumber: source.pageNumber,
+          chunkIndex: source.chunkIndex,
+          similarity: source.similarity,
+        }));
+
+        headers.set(
+          "X-NARA-Knowledge-Sources",
+          encodeURIComponent(JSON.stringify(citations)),
+        );
+      } catch (error) {
+        console.warn("[NARA] Could not serialize knowledge citations:", error);
+      }
+    }
+
     if (process.env.NODE_ENV === "development") {
       try {
         headers.set(
           "X-NARA-Memory-Debug",
           encodeURIComponent(JSON.stringify(memoryResult.debug)),
         );
+
+        headers.set(
+          "X-NARA-Knowledge-Debug",
+          encodeURIComponent(JSON.stringify(knowledgeResult.debug)),
+        );
       } catch (error) {
-        console.warn("[NARA] Could not serialize memory debug header:", error);
+        console.warn(
+          "[NARA] Could not serialize retrieval debug metadata:",
+          error,
+        );
       }
     }
 
