@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "memory:eval": "tsx scripts/evaluate-memory-retrieval.ts",
     "knowledge:eval": "tsx scripts/evaluate-knowledge-retrieval.ts",
-    "knowledge:citations": "tsx scripts/evaluate-knowledge-citations.ts"
+    "knowledge:citations": "tsx scripts/evaluate-knowledge-citations.ts",
+    "personality:eval": "tsx scripts/evaluate-personality-context.ts"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",

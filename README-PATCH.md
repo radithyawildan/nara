@@ -1,26 +1,25 @@
-# NARA Personality & Adaptive Context v1
+# NARA Adaptive Context v1.1
 
 Adds:
 
-- user-configurable NARA personality profile
-- tone, language, verbosity, initiative, code style, emoji preference
-- Supabase Auth user_metadata persistence
-- server-side adaptive personality prompt
-- Personality Center UI
-- no database migration required
+- Personality quick presets
+- Explicit context conflict-resolution hierarchy
+- Development-only Adaptive Context Inspector
+- `pnpm personality:eval` regression gate
+- No database migration
 
-Apply from repository root:
+Apply:
 
 ```powershell
 Expand-Archive `
-  -Path "$HOME\Downloads\nara-personality-v1-patch.zip" `
+  -Path "$HOME\Downloads\nara-personality-v1.1-patch.zip" `
   -DestinationPath . `
   -Force
 
-node scripts\apply-personality-v1.mjs
+node scripts\apply-personality-v11.mjs
 ```
 
-Then:
+Validate:
 
 ```powershell
 pnpm format
@@ -29,5 +28,6 @@ pnpm typecheck
 pnpm memory:eval
 pnpm knowledge:eval
 pnpm knowledge:citations
+pnpm personality:eval
 pnpm build
 ```

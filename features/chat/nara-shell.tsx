@@ -7,6 +7,7 @@ import { avatarReducer } from "@/features/avatar/avatar-machine";
 import { NaraAvatar } from "@/features/avatar/nara-avatar";
 import { AccountCenter } from "@/features/account/account-center";
 import { PersonalityCenter } from "@/features/personality/personality-center";
+import { AdaptiveContextInspector } from "@/features/debug/adaptive-context-inspector";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
@@ -1411,6 +1412,8 @@ export function NaraShell() {
         open={knowledgeCenterOpen}
         onClose={() => setKnowledgeCenterOpen(false)}
       />
+
+      <AdaptiveContextInspector />
 
       <MemoryDebugInspector debug={memoryDebug} />
 

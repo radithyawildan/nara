@@ -7,6 +7,14 @@ import {
 
 const METADATA_KEY = "nara_personality";
 
+export const ADAPTIVE_CONTEXT_PRIORITY = [
+  "Current explicit user request",
+  "Explicit saved response-style memory",
+  "Personality profile",
+  "General long-term memory",
+  "Knowledge / RAG grounding",
+] as const;
+
 function toneInstruction(profile: NaraPersonalityProfile) {
   switch (profile.tone) {
     case "warm":
@@ -25,9 +33,9 @@ function toneInstruction(profile: NaraPersonalityProfile) {
 function languageInstruction(profile: NaraPersonalityProfile) {
   switch (profile.language) {
     case "id":
-      return "Respond in Indonesian unless the user explicitly asks for another language.";
+      return "Respond in Indonesian unless the current user explicitly asks for another language.";
     case "en":
-      return "Respond in English unless the user explicitly asks for another language.";
+      return "Respond in English unless the current user explicitly asks for another language.";
     default:
       return "Follow the language used by the user and switch naturally when they switch languages.";
   }
@@ -47,7 +55,7 @@ function verbosityInstruction(level: number) {
   }
 
   if (level >= 5) {
-    return "Give thorough answers with context, reasoning summaries, examples, edge cases, and implementation detail when relevant.";
+    return "Give thorough answers with context, concise reasoning summaries, examples, edge cases, and implementation detail when relevant.";
   }
 
   return "Use moderate detail: enough explanation to be useful without unnecessary expansion.";
@@ -86,6 +94,19 @@ function codeStyleInstruction(profile: NaraPersonalityProfile) {
   }
 }
 
+function priorityInstructions() {
+  return [
+    "Adaptive context conflict resolution:",
+    "1. The current explicit user request always wins.",
+    "2. A saved response-style memory may override the general personality profile when it clearly applies.",
+    "3. The personality profile controls default communication style when there is no more specific instruction.",
+    "4. General memories personalize context but must not override current instructions.",
+    "5. Knowledge / RAG sources ground factual claims; style preferences must never change source facts.",
+    "",
+    "When two contexts conflict, follow the higher-priority item and do not mention the conflict unless the user asks.",
+  ].join("\n");
+}
+
 export function buildPersonalityInstructions(profile: NaraPersonalityProfile) {
   const emojiInstruction = profile.useEmoji
     ? "Emoji may be used sparingly when they fit the user's tone."
@@ -100,36 +121,37 @@ export function buildPersonalityInstructions(profile: NaraPersonalityProfile) {
     `- ${codeStyleInstruction(profile)}`,
     `- ${emojiInstruction}`,
     "",
-    "These are user preferences, not hard constraints. Current explicit user instructions always take priority.",
-    "Saved long-term memory may further personalize the response, but should not override the current request.",
+    priorityInstructions(),
   ].join("\n");
 }
 
-export async function getPersonalityInstructions() {
+export async function getPersonalityProfileServer() {
   const supabase = await getSupabaseServerClient();
 
   if (!supabase) {
-    return buildPersonalityInstructions(DEFAULT_NARA_PERSONALITY);
+    return { ...DEFAULT_NARA_PERSONALITY };
   }
 
   try {
     const { data, error } = await supabase.auth.getUser();
 
     if (error || !data.user) {
-      return buildPersonalityInstructions(DEFAULT_NARA_PERSONALITY);
+      return { ...DEFAULT_NARA_PERSONALITY };
     }
 
-    const profile = normalizeNaraPersonality(
-      data.user.user_metadata?.[METADATA_KEY],
-    );
-
-    return buildPersonalityInstructions(profile);
+    return normalizeNaraPersonality(data.user.user_metadata?.[METADATA_KEY]);
   } catch (error) {
     console.warn(
       "[NARA] Personality profile unavailable; using defaults:",
       error,
     );
 
-    return buildPersonalityInstructions(DEFAULT_NARA_PERSONALITY);
+    return { ...DEFAULT_NARA_PERSONALITY };
   }
+}
+
+export async function getPersonalityInstructions() {
+  const profile = await getPersonalityProfileServer();
+
+  return buildPersonalityInstructions(profile);
 }

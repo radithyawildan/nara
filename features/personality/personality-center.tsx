@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import {
@@ -6,6 +6,7 @@ import {
   resetPersonalityProfile,
   savePersonalityProfile,
 } from "@/lib/personality/client";
+import { PERSONALITY_PRESETS } from "@/lib/personality/presets";
 import {
   DEFAULT_NARA_PERSONALITY,
   NARA_CODE_STYLES,
@@ -59,7 +60,7 @@ function LevelControl({
         <div>
           <p className="text-xs font-medium text-slate-200">{label}</p>
           <p className="mt-1 text-[10px] text-slate-600">
-            {low} â†’ {high}
+            {low} → {high}
           </p>
         </div>
 
@@ -79,6 +80,10 @@ function LevelControl({
       />
     </div>
   );
+}
+
+function announcePersonalityUpdate() {
+  window.dispatchEvent(new CustomEvent("nara:personality-updated"));
 }
 
 export function PersonalityCenter({ open, onClose }: PersonalityCenterProps) {
@@ -145,6 +150,7 @@ export function PersonalityCenter({ open, onClose }: PersonalityCenterProps) {
 
       setProfile(saved);
       setNotice("Personality preferences saved.");
+      announcePersonalityUpdate();
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -166,6 +172,7 @@ export function PersonalityCenter({ open, onClose }: PersonalityCenterProps) {
 
       setProfile(saved);
       setNotice("Personality reset to NARA defaults.");
+      announcePersonalityUpdate();
     } catch (resetError) {
       setError(
         resetError instanceof Error
@@ -205,7 +212,7 @@ export function PersonalityCenter({ open, onClose }: PersonalityCenterProps) {
             onClick={onClose}
             className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.06] text-slate-500 transition hover:bg-white/[0.05] hover:text-white"
           >
-            Ã—
+            ×
           </button>
         </header>
 
@@ -221,6 +228,35 @@ export function PersonalityCenter({ open, onClose }: PersonalityCenterProps) {
             </div>
           ) : (
             <div className="space-y-4">
+              <div>
+                <p className="mb-2 text-[9px] font-medium tracking-[0.12em] text-slate-600 uppercase">
+                  Quick presets
+                </p>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {PERSONALITY_PRESETS.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setProfile({ ...preset.profile });
+                        setNotice(
+                          `${preset.label} preset loaded. Save to apply.`,
+                        );
+                      }}
+                      className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:border-violet-400/20 hover:bg-violet-400/[0.05]"
+                    >
+                      <p className="text-xs font-medium text-slate-200">
+                        {preset.label}
+                      </p>
+                      <p className="mt-1 text-[10px] leading-4 text-slate-600">
+                        {preset.description}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-4">
                   <span className="text-xs font-medium text-slate-200">
@@ -350,11 +386,18 @@ export function PersonalityCenter({ open, onClose }: PersonalityCenterProps) {
                 <p className="text-[10px] font-medium tracking-[0.12em] text-cyan-200/70 uppercase">
                   Context priority
                 </p>
-                <p className="mt-2 text-[11px] leading-5 text-slate-500">
-                  Current request â†’ explicit instructions â†’ personality â†’
-                  long-term memory â†’ knowledge sources. Personality changes
-                  how NARA responds, not the factual content of saved memory or
-                  RAG documents.
+
+                <div className="mt-3 space-y-1 text-[10px] text-slate-500">
+                  <p>1. Current explicit request</p>
+                  <p>2. Explicit response-style memory</p>
+                  <p>3. Personality profile</p>
+                  <p>4. General memory</p>
+                  <p>5. Knowledge grounding</p>
+                </div>
+
+                <p className="mt-3 text-[10px] leading-4 text-slate-600">
+                  Knowledge still governs source facts. Personality only changes
+                  how grounded information is communicated.
                 </p>
               </div>
 
