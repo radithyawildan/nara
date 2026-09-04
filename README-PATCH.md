@@ -1,38 +1,23 @@
-# NARA Knowledge / RAG v1.5 — Citation Integrity
+# NARA Account & Identity v1
 
-This patch adds a deterministic citation guard after the streamed assistant answer completes.
+Adds an optional permanent account layer on top of NARA's existing anonymous Supabase session.
 
-## What changes
+## Included
 
-- Only source markers actually used in the final answer are persisted with the assistant message.
-- Hallucinated markers such as `[K99]` are removed when they were not part of retrieval.
-- Citation IDs are normalized (`[k1]` → `[K1]`).
-- Repeated source markers keep one citation metadata record.
-- Assistant bubble citation chips are updated immediately after streaming, not only after history reload.
-- Development logs flag cases where sources were retrieved but the model cited none of them.
-- Adds `pnpm knowledge:citations` regression tests.
+- Upgrade the current anonymous user by linking an email identity.
+- Verify the email with the email-change OTP.
+- Add a password after verification.
+- Existing user ID is preserved during upgrade, so existing conversations, memories, and knowledge remain attached.
+- Sign in to an existing account from another device.
+- Lightweight display-name profile stored in Supabase Auth user metadata.
+- Sign out for permanent accounts.
 
-No Supabase migration is required.
+## Supabase dashboard prerequisite
 
-## Apply
+Enable manual identity linking for the project before testing anonymous-to-permanent upgrade.
 
-```powershell
-Expand-Archive `
-  -Path "$HOME\Downloads\nara-rag-v1.5-patch.zip" `
-  -DestinationPath . `
-  -Force
+No SQL migration is required.
 
-node scripts\apply-knowledge-rag-v15.mjs
-```
+## Important v1 limitation
 
-## Validate
-
-```powershell
-pnpm format
-pnpm lint
-pnpm typecheck
-pnpm memory:eval
-pnpm knowledge:eval
-pnpm knowledge:citations
-pnpm build
-```
+Signing in to an already-existing account from an anonymous session switches identities; anonymous data is not merged into the existing account. Account merge is intentionally deferred.

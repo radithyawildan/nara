@@ -5,6 +5,7 @@ import { backfillMemoryEmbeddings } from "@/lib/memory/client";
 
 import { avatarReducer } from "@/features/avatar/avatar-machine";
 import { NaraAvatar } from "@/features/avatar/nara-avatar";
+import { AccountCenter } from "@/features/account/account-center";
 import { Composer } from "@/features/chat/composer";
 import { MessageList } from "@/features/chat/message-list";
 import { MemoryCenter } from "@/features/memory/memory-center";
@@ -126,6 +127,24 @@ function MemoryIcon() {
   );
 }
 
+function AccountIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+    </svg>
+  );
+}
+
 import type { MemoryRetrievalDebug } from "@/types/memory-debug";
 
 export function NaraShell() {
@@ -174,6 +193,8 @@ export function NaraShell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const [memoryCenterOpen, setMemoryCenterOpen] = useState(false);
+
+  const [accountCenterOpen, setAccountCenterOpen] = useState(false);
 
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
 
@@ -1115,6 +1136,8 @@ export function NaraShell() {
                 setSettingsOpen(false);
                 setKnowledgeCenterOpen(false);
 
+                setAccountCenterOpen(false);
+
                 setMemoryCenterOpen(true);
               }}
               aria-label="Open Memory Center"
@@ -1136,11 +1159,27 @@ export function NaraShell() {
 
             <button
               type="button"
+              aria-label="Open account center"
+              aria-expanded={accountCenterOpen}
+              onClick={() => {
+                setSettingsOpen(false);
+                setMemoryCenterOpen(false);
+                setAccountCenterOpen(true);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/[0.08] bg-white/[0.035] text-slate-400 transition hover:border-violet-400/20 hover:bg-violet-400/[0.08] hover:text-white"
+            >
+              <AccountIcon />
+            </button>
+
+            <button
+              type="button"
               aria-label="Open voice settings"
               aria-expanded={settingsOpen}
               onClick={() => {
                 setMemoryCenterOpen(false);
                 setKnowledgeCenterOpen(false);
+
+                setAccountCenterOpen(false);
 
                 setSettingsOpen((current) => !current);
               }}
@@ -1179,6 +1218,8 @@ export function NaraShell() {
               onOpenMemories={() => {
                 setSettingsOpen(false);
                 setKnowledgeCenterOpen(false);
+
+                setAccountCenterOpen(false);
 
                 setMemoryCenterOpen(true);
               }}
@@ -1312,6 +1353,11 @@ export function NaraShell() {
       />
 
       <MemoryDebugInspector debug={memoryDebug} />
+
+      <AccountCenter
+        open={accountCenterOpen}
+        onClose={() => setAccountCenterOpen(false)}
+      />
 
       <MemoryCenter
         open={memoryCenterOpen}
