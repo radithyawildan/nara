@@ -196,6 +196,22 @@ export function NaraShell() {
 
   const [accountCenterOpen, setAccountCenterOpen] = useState(false);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get("account") !== "recovery") {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setSettingsOpen(false);
+
+      setMemoryCenterOpen(false);
+
+      setAccountCenterOpen(true);
+    });
+  }, []);
+
   const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
 
   const [autoSpeak, setAutoSpeak] = useState(true);

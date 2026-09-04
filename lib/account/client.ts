@@ -34,7 +34,6 @@ function toAccountState(user: {
 
 export async function getCurrentAccount() {
   const supabase = getClient();
-
   const { data, error } = await supabase.auth.getUser();
 
   if (error) {
@@ -155,6 +154,83 @@ export async function signInToExistingAccount(email: string, password: string) {
   return toAccountState(data.user);
 }
 
+export async function sendPasswordRecovery(email: string) {
+  const supabase = getClient();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new Error("Email is required.");
+  }
+
+  const redirectTo = `${window.location.origin}/?account=recovery`;
+
+  const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+    redirectTo,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function completePasswordRecovery(password: string) {
+  const supabase = getClient();
+
+  if (password.length < 8) {
+    throw new Error("Password must contain at least 8 characters.");
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error("Password recovery did not return a user.");
+  }
+
+  return toAccountState(data.user);
+}
+
+export async function changeAccountPassword(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const supabase = getClient();
+
+  if (!currentPassword) {
+    throw new Error("Current password is required.");
+  }
+
+  if (newPassword.length < 8) {
+    throw new Error("New password must contain at least 8 characters.");
+  }
+
+  if (currentPassword === newPassword) {
+    throw new Error(
+      "New password must be different from the current password.",
+    );
+  }
+
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+    current_password: currentPassword,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data.user) {
+    throw new Error("Password update did not return a user.");
+  }
+
+  return toAccountState(data.user);
+}
+
 export async function updateAccountDisplayName(displayName: string) {
   const supabase = getClient();
   const normalizedName = displayName.trim();
@@ -176,12 +252,33 @@ export async function updateAccountDisplayName(displayName: string) {
   return toAccountState(data.user);
 }
 
-export async function signOutNaraAccount() {
+export async function signOutCurrentDevice() {
   const supabase = getClient();
-
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut({ scope: "local" });
 
   if (error) {
     throw error;
   }
+}
+
+export async function signOutOtherDevices() {
+  const supabase = getClient();
+  const { error } = await supabase.auth.signOut({ scope: "others" });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function signOutAllDevices() {
+  const supabase = getClient();
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function signOutNaraAccount() {
+  return signOutCurrentDevice();
 }
