@@ -8,6 +8,7 @@ interface SettingsHubProps {
   onOpenKnowledge?: () => void;
   onOpenPersonality?: () => void;
   onOpenAccount?: () => void;
+  onOpenAbout?: () => void;
 }
 
 interface HubActionProps {
@@ -54,6 +55,7 @@ export function SettingsHub({
   onOpenKnowledge,
   onOpenPersonality,
   onOpenAccount,
+  onOpenAbout,
 }: SettingsHubProps) {
   if (!open) {
     return null;
@@ -122,6 +124,11 @@ export function SettingsHub({
             title="Account"
             description="Identity, security, recovery, and sessions."
             onClick={onOpenAccount ? () => launch(onOpenAccount) : undefined}
+          />
+          <HubAction
+            title="About NARA"
+            description="Version, release channel, runtime readiness, and diagnostics."
+            onClick={onOpenAbout ? () => launch(onOpenAbout) : undefined}
           />
           <HubAction
             title="Quick actions"

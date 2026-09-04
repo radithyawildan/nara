@@ -1,15 +1,26 @@
 import { getRuntimeReadiness } from "@/lib/env/runtime";
+import { getNaraReleaseInfo, shortGitSha } from "@/lib/release/info";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const readiness = getRuntimeReadiness();
+  const release = getNaraReleaseInfo();
 
   return Response.json(
     {
-      status: "ok",
       service: "nara",
-      environment: process.env.NODE_ENV,
+      status:
+        readiness.aiConfigured && readiness.supabaseConfigured
+          ? "ready"
+          : "degraded",
+      release: {
+        version: release.version,
+        channel: release.channel,
+        gitSha: shortGitSha(release.gitSha),
+        environment: release.environment,
+        buildTime: release.buildTime,
+      },
       readiness: {
         aiProvider: readiness.aiProvider,
         aiConfigured: readiness.aiConfigured,

@@ -55,9 +55,14 @@ export function RuntimeStatus() {
   }, []);
 
   const online = state === "online";
+  const label =
+    state === "checking" ? "Checking" : online ? "Online" : "Offline";
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label={`NARA runtime ${label.toLowerCase()}`}
       title={
         state === "checking"
           ? "Checking NARA runtime"
@@ -74,6 +79,7 @@ export function RuntimeStatus() {
       }`}
     >
       <span
+        aria-hidden="true"
         className={`h-1.5 w-1.5 rounded-full ${
           state === "checking"
             ? "bg-slate-500"
@@ -83,7 +89,7 @@ export function RuntimeStatus() {
         }`}
       />
 
-      {state === "checking" ? "Checking" : online ? "Online" : "Offline"}
+      {label}
     </div>
   );
 }

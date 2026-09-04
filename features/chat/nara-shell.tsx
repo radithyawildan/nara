@@ -17,6 +17,7 @@ import { MemoryDebugInspector } from "@/features/memory/memory-debug-inspector";
 import { MemorySuggestionCard } from "@/features/memory/memory-suggestion-card";
 import { NaraSidebar } from "@/features/navigation/nara-sidebar";
 import { RuntimeStatus } from "@/features/system/runtime-status";
+import { AboutNara } from "@/features/system/about-nara";
 import {
   ControlCenterIcon,
   SettingsHub,
@@ -230,6 +231,8 @@ export function NaraShell() {
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
 
   const [settingsHubOpen, setSettingsHubOpen] = useState(false);
+
+  const [aboutNaraOpen, setAboutNaraOpen] = useState(false);
 
   const [memoryCenterOpen, setMemoryCenterOpen] = useState(false);
 
@@ -1508,6 +1511,9 @@ export function NaraShell() {
         onOpenAccount={() => {
           setAccountCenterOpen(true);
         }}
+        onOpenAbout={() => {
+          setAboutNaraOpen(true);
+        }}
       />
 
       <NaraCommandPalette
@@ -1520,6 +1526,7 @@ export function NaraShell() {
         onOpenControls={() => setSettingsHubOpen(true)}
         onOpenHistory={() => setMobileHistoryOpen(true)}
       />
+      <AboutNara open={aboutNaraOpen} onClose={() => setAboutNaraOpen(false)} />
     </main>
   );
 }

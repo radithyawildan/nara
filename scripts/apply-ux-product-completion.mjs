@@ -172,9 +172,6 @@ if (!shell.includes("<MobileHistoryDrawer")) {
   if (mainClose === -1) {
     throw new Error("</main> not found.");
   }
-
-  const optionalHandlers = [];
-
   const knowledgeOpen = shell.includes("setKnowledgeCenterOpen")
     ? `onOpenKnowledge={() => {
           setKnowledgeCenterOpen(true);
