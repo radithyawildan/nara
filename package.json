@@ -18,10 +18,11 @@
     "ux:eval": "tsx scripts/evaluate-ux-product.ts",
     "hardening:eval": "tsx scripts/evaluate-hardening.ts",
     "preflight": "node scripts/preflight.mjs",
-    "release:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm memory:eval && pnpm knowledge:eval && pnpm knowledge:citations && pnpm personality:eval && pnpm conversation:eval && pnpm conversation:state && pnpm ux:eval && pnpm hardening:eval && pnpm release:smoke && pnpm preflight && pnpm build",
+    "release:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm memory:eval && pnpm knowledge:eval && pnpm knowledge:citations && pnpm personality:eval && pnpm conversation:eval && pnpm conversation:state && pnpm ux:eval && pnpm hardening:eval && pnpm release:smoke && pnpm deployment:doctor && pnpm preflight && pnpm build",
     "release:smoke": "node scripts/release-smoke.mjs",
     "release:info": "node scripts/release-info.mjs",
-    "conversation:state": "tsx scripts/evaluate-conversation-state.ts"
+    "conversation:state": "tsx scripts/evaluate-conversation-state.ts",
+    "deployment:doctor": "node scripts/deployment-doctor.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",

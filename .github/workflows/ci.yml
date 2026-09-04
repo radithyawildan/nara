@@ -1,0 +1,79 @@
+name: NARA CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    env:
+      NARA_AI_PROVIDER: mock
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      NEXT_PUBLIC_NARA_VERSION: 0.1.0-ci
+      NEXT_PUBLIC_NARA_RELEASE_CHANNEL: ci
+      NEXT_PUBLIC_SITE_URL: https://example.com
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Memory evaluation
+        run: pnpm memory:eval
+
+      - name: Knowledge retrieval evaluation
+        run: pnpm knowledge:eval
+
+      - name: Citation integrity evaluation
+        run: pnpm knowledge:citations
+
+      - name: Personality evaluation
+        run: pnpm personality:eval
+
+      - name: Conversation intelligence evaluation
+        run: pnpm conversation:eval
+
+      - name: Persistent conversation state evaluation
+        if: ${{ hashFiles('scripts/evaluate-conversation-state.ts') != '' }}
+        run: pnpm conversation:state
+
+      - name: UX evaluation
+        run: pnpm ux:eval
+
+      - name: Hardening evaluation
+        run: pnpm hardening:eval
+
+      - name: Release smoke
+        run: pnpm release:smoke
+
+      - name: Production build
+        run: pnpm build
