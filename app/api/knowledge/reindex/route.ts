@@ -25,6 +25,7 @@ interface KnowledgeDocumentRow {
   chunk_count: number;
   character_count: number;
   error_message: string | null;
+  storage_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -49,6 +50,7 @@ function mapDocument(row: KnowledgeDocumentRow): KnowledgeDocument {
     chunkCount: row.chunk_count,
     characterCount: row.character_count,
     errorMessage: row.error_message,
+    hasOriginalFile: Boolean(row.storage_path),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
   const { data: documentData, error: documentError } = await supabase
     .from("knowledge_documents")
     .select(
-      "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,created_at,updated_at",
+      "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,storage_path,created_at,updated_at",
     )
     .eq("id", result.data.documentId)
     .single();
@@ -175,7 +177,7 @@ export async function POST(request: Request) {
       })
       .eq("id", result.data.documentId)
       .select(
-        "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,created_at,updated_at",
+        "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,storage_path,created_at,updated_at",
       )
       .single();
 

@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 
-import { getKnowledgeChunkPreview } from "@/lib/knowledge/client";
+import {
+  getKnowledgeChunkPreview,
+  getKnowledgeOriginalFileUrl,
+} from "@/lib/knowledge/client";
 import type {
   KnowledgeChunkPreview,
   KnowledgeCitation,
@@ -29,6 +32,7 @@ export function KnowledgeSourceTray({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
+  const [openingOriginal, setOpeningOriginal] = useState(false);
 
   if (sources.length === 0 && !debug) {
     return null;
@@ -50,6 +54,29 @@ export function KnowledgeSourceTray({
       );
     } finally {
       setLoadingId(null);
+    }
+  }
+
+  async function openOriginalFile() {
+    if (!previewSource) {
+      return;
+    }
+
+    setOpeningOriginal(true);
+    setError(null);
+
+    try {
+      const url = await getKnowledgeOriginalFileUrl(previewSource.documentId);
+
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (openError) {
+      setError(
+        openError instanceof Error
+          ? openError.message
+          : "Could not open the original source file.",
+      );
+    } finally {
+      setOpeningOriginal(false);
     }
   }
 
@@ -163,17 +190,28 @@ export function KnowledgeSourceTray({
                 </p>
               </div>
 
-              <button
-                type="button"
-                aria-label="Close source preview"
-                onClick={() => {
-                  setPreview(null);
-                  setPreviewSource(null);
-                }}
-                className="grid h-8 w-8 place-items-center rounded-full text-slate-600 transition hover:bg-white/[0.05] hover:text-white"
-              >
-                ×
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={openingOriginal}
+                  onClick={() => void openOriginalFile()}
+                  className="rounded-full border border-cyan-400/15 bg-cyan-400/[0.04] px-3 py-1.5 text-[9px] text-cyan-200/80 transition hover:border-cyan-400/30 hover:bg-cyan-400/[0.08] disabled:opacity-40"
+                >
+                  {openingOriginal ? "Opening..." : "Open original"}
+                </button>
+
+                <button
+                  type="button"
+                  aria-label="Close source preview"
+                  onClick={() => {
+                    setPreview(null);
+                    setPreviewSource(null);
+                  }}
+                  className="grid h-8 w-8 place-items-center rounded-full text-slate-600 transition hover:bg-white/[0.05] hover:text-white"
+                >
+                  ×
+                </button>
+              </div>
             </header>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-5">

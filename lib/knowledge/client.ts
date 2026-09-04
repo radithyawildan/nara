@@ -16,6 +16,7 @@ interface KnowledgeDocumentRow {
   chunk_count: number;
   character_count: number;
   error_message: string | null;
+  storage_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -44,6 +45,7 @@ function mapDocument(row: KnowledgeDocumentRow): KnowledgeDocument {
     chunkCount: row.chunk_count,
     characterCount: row.character_count,
     errorMessage: row.error_message,
+    hasOriginalFile: Boolean(row.storage_path),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -104,7 +106,7 @@ export async function listKnowledgeDocuments() {
   const { data, error } = await supabase
     .from("knowledge_documents")
     .select(
-      "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,created_at,updated_at",
+      "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,storage_path,created_at,updated_at",
     )
     .order("updated_at", {
       ascending: false,
@@ -124,17 +126,10 @@ export async function uploadKnowledgeDocument(file: File) {
   const formData = new FormData();
   formData.set("file", file);
 
-  let response: Response;
-
-  try {
-    response = await fetch("/api/knowledge/upload", {
-      method: "POST",
-      body: formData,
-    });
-  } catch (error) {
-    console.error("[NARA] Knowledge upload API unreachable:", error);
-    throw new Error("Could not reach the Knowledge upload API.");
-  }
+  const response = await fetch("/api/knowledge/upload", {
+    method: "POST",
+    body: formData,
+  });
 
   if (!response.ok) {
     throw new Error(await getErrorMessage(response));
@@ -150,16 +145,45 @@ export async function uploadKnowledgeDocument(file: File) {
 }
 
 export async function deleteKnowledgeDocument(documentId: string) {
-  const supabase = await ensureKnowledgeUser();
+  await ensureKnowledgeUser();
 
-  const { error } = await supabase
-    .from("knowledge_documents")
-    .delete()
-    .eq("id", documentId);
+  const response = await fetch("/api/knowledge/delete", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ documentId }),
+  });
 
-  if (error) {
-    throw error;
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
   }
+}
+
+export async function getKnowledgeOriginalFileUrl(documentId: string) {
+  await ensureKnowledgeUser();
+
+  const response = await fetch(
+    `/api/knowledge/file?documentId=${encodeURIComponent(documentId)}`,
+    {
+      method: "GET",
+      cache: "no-store",
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response));
+  }
+
+  const payload = (await response.json()) as {
+    url?: string;
+  };
+
+  if (!payload.url) {
+    throw new Error("Knowledge file URL was not returned.");
+  }
+
+  return payload.url;
 }
 
 export async function reindexKnowledgeDocument(documentId: string) {

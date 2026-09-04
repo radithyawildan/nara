@@ -48,6 +48,18 @@ import type {
 
 type InputSource = "text" | "voice";
 
+function getLatestKnowledgeCitations(messages: ConversationMessage[]) {
+  return (
+    [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === "assistant" &&
+          (message.knowledgeCitations?.length ?? 0) > 0,
+      )?.knowledgeCitations ?? []
+  );
+}
+
 function extractExplicitMemory(content: string) {
   const match = content.match(/^(?:ingat|remember)(?:lah)?\s*:?\s*(.+)$/i);
 
@@ -255,6 +267,10 @@ export function NaraShell() {
         setActiveConversationId(latestConversation.id);
 
         setMessages(storedMessages);
+
+        setKnowledgeSources(getLatestKnowledgeCitations(storedMessages));
+
+        setKnowledgeDebug(null);
       } catch (error) {
         console.warn("[NARA] Persistence initialization failed:", error);
 
@@ -573,17 +589,20 @@ export function NaraShell() {
         signal: controller.signal,
       });
 
+      let responseKnowledgeSources: KnowledgeCitation[] = [];
+
       const encodedKnowledgeSources = response.headers.get(
         "X-NARA-Knowledge-Sources",
       );
 
       if (encodedKnowledgeSources) {
         try {
-          setKnowledgeSources(
-            JSON.parse(
-              decodeURIComponent(encodedKnowledgeSources),
-            ) as KnowledgeCitation[],
-          );
+          const parsedKnowledgeSources = JSON.parse(
+            decodeURIComponent(encodedKnowledgeSources),
+          ) as KnowledgeCitation[];
+
+          responseKnowledgeSources = parsedKnowledgeSources;
+          setKnowledgeSources(parsedKnowledgeSources);
         } catch (error) {
           console.warn("[NARA] Could not parse knowledge citations:", error);
           setKnowledgeSources([]);
@@ -726,6 +745,7 @@ export function NaraShell() {
         role: "assistant",
         content: assistantContent,
         createdAt: assistantCreatedAt,
+        knowledgeCitations: responseKnowledgeSources,
       };
 
       if (conversationId) {
@@ -942,6 +962,10 @@ export function NaraShell() {
         setActiveConversationId(fallbackConversation.id);
 
         setMessages(storedMessages);
+
+        setKnowledgeSources(getLatestKnowledgeCitations(storedMessages));
+
+        setKnowledgeDebug(null);
       } catch (loadError) {
         console.error(
           "[NARA] Failed to load fallback conversation:",
@@ -987,6 +1011,10 @@ export function NaraShell() {
       setActiveConversationId(conversationId);
 
       setMessages(storedMessages);
+
+      setKnowledgeSources(getLatestKnowledgeCitations(storedMessages));
+
+      setKnowledgeDebug(null);
     } catch (error) {
       console.error("[NARA] Failed to load conversation:", error);
 

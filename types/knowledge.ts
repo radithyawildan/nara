@@ -10,6 +10,7 @@ export interface KnowledgeDocument {
   chunkCount: number;
   characterCount: number;
   errorMessage: string | null;
+  hasOriginalFile?: boolean;
   createdAt: string;
   updatedAt: string;
 }

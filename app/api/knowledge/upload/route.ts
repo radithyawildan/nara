@@ -28,6 +28,7 @@ interface KnowledgeDocumentRow {
   chunk_count: number;
   character_count: number;
   error_message: string | null;
+  storage_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +44,7 @@ function mapDocument(row: KnowledgeDocumentRow): KnowledgeDocument {
     chunkCount: row.chunk_count,
     characterCount: row.character_count,
     errorMessage: row.error_message,
+    hasOriginalFile: Boolean(row.storage_path),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -215,7 +217,7 @@ export async function POST(request: Request) {
       character_count: characterCount,
     })
     .select(
-      "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,created_at,updated_at",
+      "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,storage_path,created_at,updated_at",
     )
     .single();
 
@@ -231,6 +233,52 @@ export async function POST(request: Request) {
   }
 
   const document = insertedDocument as KnowledgeDocumentRow;
+
+  const storagePath = `${authData.user.id}/${document.id}/${filename}`;
+
+  try {
+    const originalBytes = new Uint8Array(await value.arrayBuffer());
+
+    const { error: storageError } = await supabase.storage
+      .from("knowledge-files")
+      .upload(storagePath, originalBytes, {
+        contentType: mimeType,
+        upsert: false,
+      });
+
+    if (storageError) {
+      throw storageError;
+    }
+
+    const { error: storagePathError } = await supabase
+      .from("knowledge_documents")
+      .update({
+        storage_path: storagePath,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", document.id);
+
+    if (storagePathError) {
+      await supabase.storage.from("knowledge-files").remove([storagePath]);
+      throw storagePathError;
+    }
+  } catch (error) {
+    console.error("[NARA] Original knowledge file storage failed:", error);
+
+    await supabase
+      .from("knowledge_documents")
+      .update({
+        status: "error",
+        error_message: "Could not store the original document.",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", document.id);
+
+    return Response.json(
+      { error: "The document could not be stored securely." },
+      { status: 502 },
+    );
+  }
 
   try {
     for (let start = 0; start < chunks.length; start += EMBEDDING_BATCH_SIZE) {
@@ -268,7 +316,7 @@ export async function POST(request: Request) {
       })
       .eq("id", document.id)
       .select(
-        "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,created_at,updated_at",
+        "id,filename,mime_type,size_bytes,status,page_count,chunk_count,character_count,error_message,storage_path,created_at,updated_at",
       )
       .single();
 

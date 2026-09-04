@@ -9,6 +9,7 @@ import type {
   ConversationMessage,
   ConversationSummary,
 } from "@/types/conversation";
+import type { KnowledgeCitation } from "@/types/knowledge";
 
 interface ConversationRow {
   id: string;
@@ -22,6 +23,7 @@ interface MessageRow {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  knowledge_citations: KnowledgeCitation[] | null;
 }
 
 function toConversationSummary(row: ConversationRow): ConversationSummary {
@@ -245,7 +247,7 @@ export async function loadConversationMessages(conversationId: string) {
 
   const { data, error } = await supabase
     .from("messages")
-    .select("id,role,content,created_at")
+    .select("id,role,content,created_at,knowledge_citations")
     .eq("conversation_id", conversationId)
     .order("created_at", {
       ascending: true,
@@ -260,6 +262,7 @@ export async function loadConversationMessages(conversationId: string) {
     role: row.role,
     content: row.content,
     createdAt: row.created_at,
+    knowledgeCitations: row.knowledge_citations ?? [],
   }));
 }
 
@@ -286,6 +289,7 @@ export async function saveConversationMessage(
     role: message.role,
     content: message.content,
     created_at: message.createdAt,
+    knowledge_citations: message.knowledgeCitations ?? [],
   });
 
   if (messageError) {

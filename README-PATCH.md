@@ -1,27 +1,30 @@
-# NARA Knowledge / RAG v1.1
+# NARA Knowledge / RAG v1.2
 
-Adds:
+Adds two durability features on top of v1.1:
 
-- richer Knowledge Center document management
-- document search
-- delete confirmation
-- Processing / Ready / Failed status
-- chunk/page/character metadata
-- source passage preview
-- re-index embeddings from stored chunks
-- per-response clickable [K1] source chips
-- development RAG retrieval inspector with threshold/similarity
+- **Original private document storage** in a Supabase Storage bucket (`knowledge-files`).
+  - New uploads keep the original PDF/TXT/Markdown privately.
+  - Source preview can create a short-lived signed URL and open the original document.
+  - Deleting a knowledge document also attempts to remove the original file.
+- **Persistent citations per assistant message** via `messages.knowledge_citations` JSONB.
+  - Citation metadata survives refresh/history loading.
+  - The latest sourced assistant response restores the source tray after opening a saved conversation.
+
+Existing documents indexed before v1.2 do not have an original file. Re-upload them if you want the **Open original** action.
 
 ## Apply
 
-1. Extract this ZIP into the NARA repo root with overwrite enabled.
+1. Extract the ZIP into the NARA repository root with overwrite enabled.
 2. Run:
 
 ```powershell
-node scripts\apply-knowledge-rag-v11.mjs
+node scripts\apply-knowledge-rag-v12.mjs
 ```
 
-3. Run migration `supabase/migrations/20260904161000_knowledge_rag_v11.sql` in Supabase SQL Editor.
+3. Run migration:
+
+`supabase/migrations/20260904163000_knowledge_storage_and_persistent_citations.sql`
+
 4. Validate:
 
 ```powershell
@@ -31,5 +34,3 @@ pnpm typecheck
 pnpm memory:eval
 pnpm build
 ```
-
-No new npm dependency is required for v1.1.
