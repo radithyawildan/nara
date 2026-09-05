@@ -9,7 +9,20 @@
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "memory:eval": "tsx scripts/evaluate-memory-retrieval.ts",
+    "knowledge:eval": "tsx scripts/evaluate-knowledge-retrieval.ts",
+    "knowledge:citations": "tsx scripts/evaluate-knowledge-citations.ts",
+    "personality:eval": "tsx scripts/evaluate-personality-context.ts",
+    "conversation:eval": "tsx scripts/evaluate-conversation-intelligence.ts",
+    "ux:eval": "tsx scripts/evaluate-ux-product.ts",
+    "hardening:eval": "tsx scripts/evaluate-hardening.ts",
+    "preflight": "node scripts/preflight.mjs",
+    "release:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm memory:eval && pnpm knowledge:eval && pnpm knowledge:citations && pnpm personality:eval && pnpm conversation:eval && pnpm conversation:state && pnpm ux:eval && pnpm hardening:eval && pnpm release:smoke && pnpm deployment:doctor && pnpm preflight && pnpm build",
+    "release:smoke": "node scripts/release-smoke.mjs",
+    "release:info": "node scripts/release-info.mjs",
+    "conversation:state": "tsx scripts/evaluate-conversation-state.ts",
+    "deployment:doctor": "node scripts/deployment-doctor.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.20.0",
@@ -22,6 +35,7 @@
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "unpdf": "^1.8.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
@@ -33,6 +47,7 @@
     "eslint-config-next": "16.3.4",
     "prettier": "^3.9.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   },
   "packageManager": "pnpm@11.24.0"

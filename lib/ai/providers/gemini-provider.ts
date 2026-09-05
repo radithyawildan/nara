@@ -1,4 +1,4 @@
-import { GoogleGenAI, type Content } from "@google/genai";
+﻿import { GoogleGenAI, type Content } from "@google/genai";
 
 import type { AIProvider, AIStreamOptions } from "@/lib/ai/provider";
 import type { ChatMessage } from "@/types/conversation";
@@ -115,7 +115,12 @@ export class GeminiProvider implements AIProvider {
             model,
             contents: buildContents(messages),
             config: {
-              systemInstruction: NARA_INSTRUCTIONS,
+              systemInstruction: [
+                NARA_INSTRUCTIONS,
+                options?.additionalInstructions,
+              ]
+                .filter(Boolean)
+                .join("\n\n"),
               abortSignal: options?.signal,
             },
           });

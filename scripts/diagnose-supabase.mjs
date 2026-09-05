@@ -23,10 +23,8 @@ const supabase = createClient(url, key, {
 
 console.log("\n2. Anonymous authentication");
 
-const {
-  data: authData,
-  error: authError,
-} = await supabase.auth.signInAnonymously();
+const { data: authData, error: authError } =
+  await supabase.auth.signInAnonymously();
 
 if (authError) {
   console.error("❌ Anonymous authentication failed");
@@ -43,17 +41,11 @@ if (!userId) {
 }
 
 console.log("✅ Anonymous authentication works");
-console.log(
-  "   User:",
-  `${userId.slice(0, 8)}...`,
-);
+console.log("   User:", `${userId.slice(0, 8)}...`);
 
 console.log("\n3. Read conversations table");
 
-const {
-  data: conversations,
-  error: readError,
-} = await supabase
+const { data: conversations, error: readError } = await supabase
   .from("conversations")
   .select("id,title")
   .limit(1);
@@ -67,20 +59,13 @@ if (readError) {
 }
 
 console.log("✅ conversations SELECT works");
-console.log(
-  "   Existing visible rows:",
-  conversations?.length ?? 0,
-);
+console.log("   Existing visible rows:", conversations?.length ?? 0);
 
 console.log("\n4. Test RLS INSERT");
 
-const testTitle =
-  `NARA diagnostic ${Date.now()}`;
+const testTitle = `NARA diagnostic ${Date.now()}`;
 
-const {
-  data: inserted,
-  error: insertError,
-} = await supabase
+const { data: inserted, error: insertError } = await supabase
   .from("conversations")
   .insert({
     user_id: userId,
@@ -101,9 +86,7 @@ console.log("✅ conversations INSERT works");
 
 console.log("\n5. Clean diagnostic row");
 
-const {
-  error: deleteError,
-} = await supabase
+const { error: deleteError } = await supabase
   .from("conversations")
   .delete()
   .eq("id", inserted.id);

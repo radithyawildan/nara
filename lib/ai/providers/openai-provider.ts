@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+﻿import OpenAI from "openai";
 
 import type { AIProvider, AIStreamOptions } from "@/lib/ai/provider";
 import type { ChatMessage } from "@/types/conversation";
@@ -47,7 +47,9 @@ export class OpenAIProvider implements AIProvider {
     const stream = await this.client.responses.create(
       {
         model: this.model,
-        instructions: NARA_INSTRUCTIONS,
+        instructions: [NARA_INSTRUCTIONS, options?.additionalInstructions]
+          .filter(Boolean)
+          .join("\n\n"),
         input: buildConversationInput(messages),
         stream: true,
       },

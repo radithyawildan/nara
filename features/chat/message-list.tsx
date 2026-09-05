@@ -1,178 +1,226 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef } from "react";
-
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
+import { KnowledgeMessageSources } from "@/features/knowledge/knowledge-message-sources";
 import type { ConversationMessage } from "@/types/conversation";
 
 interface MessageListProps {
   messages: ConversationMessage[];
 }
 
+function formatMessageTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function MessageList({ messages }: MessageListProps) {
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const lastMessage = messages[messages.length - 1];
+  const lastContentLength = lastMessage?.content.length ?? 0;
 
   useEffect(() => {
-    const container = scrollContainerRef.current;
+    const element = scrollRef.current;
 
-    if (!container) {
+    if (!element) {
       return;
     }
 
-    container.scrollTo({
-      top: container.scrollHeight,
+    element.scrollTo({
+      top: element.scrollHeight,
       behavior: "smooth",
     });
-  }, [messages]);
-
-  if (messages.length === 0) {
-    return (
-      <div className="grid min-h-0 flex-1 place-items-center px-6 py-10 text-center">
-        <div>
-          <p className="text-sm font-medium text-slate-300">
-            Start a conversation with NARA
-          </p>
-
-          <p className="mt-2 max-w-sm text-sm leading-6 text-slate-600">
-            Type a message or use your microphone to talk naturally.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  }, [messages.length, lastContentLength]);
 
   return (
     <div
-      ref={scrollContainerRef}
-      aria-live="polite"
-      className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 [scrollbar-color:rgba(139,92,246,0.25)_transparent] [scrollbar-width:thin]"
+      ref={scrollRef}
+      className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1"
     >
-      <div className="flex flex-col gap-4 py-2">
-        {messages.map((message) => {
-          const isUser = message.role === "user";
-
-          return (
-            <div
-              key={message.id}
-              className={`flex ${isUser ? "justify-end" : "justify-start"}`}
-            >
-              <div
-                className={
-                  isUser
-                    ? "max-w-[88%] rounded-3xl rounded-br-lg bg-violet-500 px-5 py-3 text-sm leading-6 text-white sm:max-w-[80%]"
-                    : "max-w-[92%] rounded-3xl rounded-bl-lg border border-white/10 bg-white/[0.04] px-5 py-3 text-sm leading-6 text-slate-200 sm:max-w-[88%]"
-                }
-              >
-                {message.content ? (
-                  isUser ? (
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                  ) : (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        p: ({ children }) => (
-                          <p className="mb-3 last:mb-0">{children}</p>
-                        ),
-
-                        strong: ({ children }) => (
-                          <strong className="font-semibold text-white">
-                            {children}
-                          </strong>
-                        ),
-
-                        em: ({ children }) => (
-                          <em className="text-slate-300">{children}</em>
-                        ),
-
-                        h1: ({ children }) => (
-                          <h1 className="mb-3 mt-5 text-xl font-semibold text-white first:mt-0">
-                            {children}
-                          </h1>
-                        ),
-
-                        h2: ({ children }) => (
-                          <h2 className="mb-3 mt-5 text-lg font-semibold text-white first:mt-0">
-                            {children}
-                          </h2>
-                        ),
-
-                        h3: ({ children }) => (
-                          <h3 className="mb-2 mt-4 font-semibold text-white first:mt-0">
-                            {children}
-                          </h3>
-                        ),
-
-                        ul: ({ children }) => (
-                          <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">
-                            {children}
-                          </ul>
-                        ),
-
-                        ol: ({ children }) => (
-                          <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">
-                            {children}
-                          </ol>
-                        ),
-
-                        li: ({ children }) => (
-                          <li className="pl-1">{children}</li>
-                        ),
-
-                        blockquote: ({ children }) => (
-                          <blockquote className="my-3 border-l-2 border-violet-400/50 pl-4 text-slate-400">
-                            {children}
-                          </blockquote>
-                        ),
-
-                        code: ({ children, className }) => {
-                          const isBlock = Boolean(className);
-
-                          if (isBlock) {
-                            return (
-                              <code className={className}>{children}</code>
-                            );
-                          }
-
-                          return (
-                            <code className="rounded-md border border-white/10 bg-black/40 px-1.5 py-0.5 font-mono text-[0.85em] text-violet-200">
-                              {children}
-                            </code>
-                          );
-                        },
-
-                        pre: ({ children }) => (
-                          <pre className="my-3 overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 font-mono text-xs leading-5 text-slate-300">
-                            {children}
-                          </pre>
-                        ),
-
-                        a: ({ children, href }) => (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-violet-300 underline decoration-violet-400/40 underline-offset-4 transition hover:text-violet-200"
-                          >
-                            {children}
-                          </a>
-                        ),
-
-                        hr: () => <hr className="my-4 border-white/10" />,
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  )
-                ) : (
-                  <span className="animate-pulse text-slate-500">● ● ●</span>
-                )}
-              </div>
+      {messages.length === 0 ? (
+        <div className="flex min-h-full items-center justify-center px-6 py-12 text-center">
+          <div className="max-w-sm">
+            <div className="mx-auto grid h-10 w-10 place-items-center rounded-2xl border border-violet-400/15 bg-violet-500/[0.06] text-sm font-semibold text-violet-200">
+              N
             </div>
-          );
-        })}
-      </div>
+
+            <p className="mt-4 text-sm font-medium text-slate-300">
+              Start a conversation with NARA
+            </p>
+
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Ask a question, speak naturally, or use your private Knowledge
+              sources for grounded answers.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4 py-3">
+          {messages.map((message) => {
+            const isUser = message.role === "user";
+            const citations = message.knowledgeCitations ?? [];
+
+            return (
+              <div
+                key={message.id}
+                className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+              >
+                <article
+                  className={`min-w-0 max-w-[90%] sm:max-w-[86%] ${
+                    isUser
+                      ? "rounded-[1.35rem] rounded-br-md bg-gradient-to-br from-violet-500 to-violet-600 px-4 py-3 text-white shadow-lg shadow-violet-950/10"
+                      : "rounded-[1.35rem] rounded-bl-md border border-white/[0.07] bg-white/[0.035] px-4 py-3 text-slate-200"
+                  }`}
+                >
+                  {message.content ? (
+                    <div
+                      className={`min-w-0 text-[13px] leading-6 ${
+                        isUser ? "text-white" : "text-slate-200"
+                      }`}
+                    >
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p({ children }) {
+                            return <p className="mb-2 last:mb-0">{children}</p>;
+                          },
+                          strong({ children }) {
+                            return (
+                              <strong className="font-semibold text-inherit">
+                                {children}
+                              </strong>
+                            );
+                          },
+                          em({ children }) {
+                            return <em className="italic">{children}</em>;
+                          },
+                          ul({ children }) {
+                            return (
+                              <ul className="my-2 list-disc space-y-1 pl-5">
+                                {children}
+                              </ul>
+                            );
+                          },
+                          ol({ children }) {
+                            return (
+                              <ol className="my-2 list-decimal space-y-1 pl-5">
+                                {children}
+                              </ol>
+                            );
+                          },
+                          li({ children }) {
+                            return <li className="pl-0.5">{children}</li>;
+                          },
+                          blockquote({ children }) {
+                            return (
+                              <blockquote className="my-2 border-l-2 border-cyan-300/20 pl-3 text-slate-400">
+                                {children}
+                              </blockquote>
+                            );
+                          },
+                          a({ href, children }) {
+                            return (
+                              <a
+                                href={href}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-cyan-300 underline decoration-cyan-300/30 underline-offset-2 transition hover:text-cyan-200"
+                              >
+                                {children}
+                              </a>
+                            );
+                          },
+                          code({ children, className }) {
+                            const block = className?.includes("language-");
+
+                            if (block) {
+                              return (
+                                <code className={className}>{children}</code>
+                              );
+                            }
+
+                            return (
+                              <code className="rounded-md border border-white/[0.06] bg-black/25 px-1.5 py-0.5 font-mono text-[0.9em] text-cyan-100/80">
+                                {children}
+                              </code>
+                            );
+                          },
+                          pre({ children }) {
+                            return (
+                              <pre className="my-3 overflow-x-auto rounded-xl border border-white/[0.06] bg-black/30 p-3 font-mono text-[11px] leading-5 text-slate-300">
+                                {children}
+                              </pre>
+                            );
+                          },
+                          h1({ children }) {
+                            return (
+                              <h1 className="mb-2 mt-3 text-base font-semibold first:mt-0">
+                                {children}
+                              </h1>
+                            );
+                          },
+                          h2({ children }) {
+                            return (
+                              <h2 className="mb-2 mt-3 text-sm font-semibold first:mt-0">
+                                {children}
+                              </h2>
+                            );
+                          },
+                          h3({ children }) {
+                            return (
+                              <h3 className="mb-1.5 mt-3 text-[13px] font-semibold first:mt-0">
+                                {children}
+                              </h3>
+                            );
+                          },
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div
+                      className="flex h-6 items-center gap-1.5"
+                      aria-label="NARA is responding"
+                    >
+                      {[0, 1, 2].map((index) => (
+                        <span
+                          key={index}
+                          className="h-1.5 w-1.5 animate-pulse rounded-full bg-violet-300/60"
+                          style={{ animationDelay: `${index * 120}ms` }}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {!isUser && citations.length > 0 && (
+                    <KnowledgeMessageSources citations={citations} />
+                  )}
+
+                  <p
+                    className={`mt-2 text-[8px] ${
+                      isUser ? "text-violet-100/45" : "text-slate-700"
+                    }`}
+                  >
+                    {formatMessageTime(message.createdAt)}
+                  </p>
+                </article>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

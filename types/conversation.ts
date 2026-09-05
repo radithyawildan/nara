@@ -1,4 +1,6 @@
-﻿export type MessageRole = "user" | "assistant" | "system";
+import type { KnowledgeCitation } from "@/types/knowledge";
+
+export type MessageRole = "user" | "assistant" | "system";
 
 export type ChatMessageRole = Exclude<MessageRole, "system">;
 
@@ -7,6 +9,7 @@ export interface ConversationMessage {
   role: ChatMessageRole;
   content: string;
   createdAt: string;
+  knowledgeCitations?: KnowledgeCitation[];
 }
 
 export interface ChatMessage {

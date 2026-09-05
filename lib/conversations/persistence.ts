@@ -9,6 +9,7 @@ import type {
   ConversationMessage,
   ConversationSummary,
 } from "@/types/conversation";
+import type { KnowledgeCitation } from "@/types/knowledge";
 
 interface ConversationRow {
   id: string;
@@ -22,6 +23,7 @@ interface MessageRow {
   role: "user" | "assistant";
   content: string;
   created_at: string;
+  knowledge_citations: KnowledgeCitation[] | null;
 }
 
 function toConversationSummary(row: ConversationRow): ConversationSummary {
@@ -33,18 +35,39 @@ function toConversationSummary(row: ConversationRow): ConversationSummary {
   };
 }
 
+function normalizeConversationTitle(content: string) {
+  return content
+    .replace(/[`*_#>]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function createConversationTitle(content: string) {
-  const normalized = content.replace(/\s+/g, " ").trim();
+  let normalized = normalizeConversationTitle(content);
+
+  normalized = normalized
+    .replace(/^(?:halo|hai|hi|hey|bro|nara)[,!:\s-]+/i, "")
+    .replace(/^(?:tolong|please)\s+/i, "")
+    .trim();
 
   if (!normalized) {
     return "New conversation";
   }
 
-  if (normalized.length <= 52) {
-    return normalized;
+  const firstSentence =
+    normalized.split(/(?<=[.!?])\s+/)[0]?.trim() || normalized;
+
+  if (firstSentence.length <= 58) {
+    return firstSentence;
   }
 
-  return `${normalized.slice(0, 49)}...`;
+  const shortened = firstSentence.slice(0, 55);
+
+  const lastSpace = shortened.lastIndexOf(" ");
+
+  const title = lastSpace >= 36 ? shortened.slice(0, lastSpace) : shortened;
+
+  return `${title.trim()}...`;
 }
 
 async function ensureAnonymousUserId() {
@@ -107,7 +130,7 @@ export async function listConversations() {
     .order("updated_at", {
       ascending: false,
     })
-    .limit(30);
+    .limit(50);
 
   if (error) {
     throw error;
@@ -145,6 +168,74 @@ export async function createConversation(firstMessage: string) {
   return toConversationSummary(data as ConversationRow);
 }
 
+export async function renameConversation(
+  conversationId: string,
+  title: string,
+) {
+  const supabase = getSupabaseBrowserClient();
+
+  if (!supabase) {
+    return null;
+  }
+
+  await ensureAnonymousUserId();
+
+  const normalizedTitle = normalizeConversationTitle(title);
+
+  if (!normalizedTitle) {
+    throw new Error("Conversation title cannot be empty.");
+  }
+
+  const nextTitle =
+    normalizedTitle.length <= 80
+      ? normalizedTitle
+      : normalizedTitle.slice(0, 80).trim();
+
+  const { data, error } = await supabase
+    .from("conversations")
+    .update({
+      title: nextTitle,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", conversationId)
+    .select("id,title,created_at,updated_at")
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return toConversationSummary(data as ConversationRow);
+}
+
+export async function deleteConversation(conversationId: string) {
+  const supabase = getSupabaseBrowserClient();
+
+  if (!supabase) {
+    return;
+  }
+
+  await ensureAnonymousUserId();
+
+  const { error: messageError } = await supabase
+    .from("messages")
+    .delete()
+    .eq("conversation_id", conversationId);
+
+  if (messageError) {
+    throw messageError;
+  }
+
+  const { error: conversationError } = await supabase
+    .from("conversations")
+    .delete()
+    .eq("id", conversationId);
+
+  if (conversationError) {
+    throw conversationError;
+  }
+}
+
 export async function loadConversationMessages(conversationId: string) {
   const supabase = getSupabaseBrowserClient();
 
@@ -156,7 +247,7 @@ export async function loadConversationMessages(conversationId: string) {
 
   const { data, error } = await supabase
     .from("messages")
-    .select("id,role,content,created_at")
+    .select("id,role,content,created_at,knowledge_citations")
     .eq("conversation_id", conversationId)
     .order("created_at", {
       ascending: true,
@@ -171,6 +262,7 @@ export async function loadConversationMessages(conversationId: string) {
     role: row.role,
     content: row.content,
     createdAt: row.created_at,
+    knowledgeCitations: row.knowledge_citations ?? [],
   }));
 }
 
@@ -197,6 +289,7 @@ export async function saveConversationMessage(
     role: message.role,
     content: message.content,
     created_at: message.createdAt,
+    knowledge_citations: message.knowledgeCitations ?? [],
   });
 
   if (messageError) {
